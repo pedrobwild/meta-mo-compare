@@ -1,43 +1,39 @@
 import { useCallback, useState } from 'react';
-import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, FlaskConical } from 'lucide-react';
 import { parseFile, upsertRecords, buildHierarchyMaps, enrichRecords } from '@/lib/parser';
 import { useAppState } from '@/lib/store';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 
 export default function FileUpload() {
   const { state, dispatch } = useAppState();
   const [dragging, setDragging] = useState(false);
   const [processing, setProcessing] = useState(false);
 
-  const handleFiles = useCallback(async (files: FileList | File[]) => {
+  const handleFile = useCallback(async (file: File) => {
     setProcessing(true);
     try {
-      for (const file of Array.from(files)) {
-        const { records, log, crossMonthWarning } = await parseFile(file);
-        
-        if (crossMonthWarning) {
-          toast.warning(crossMonthWarning);
-        }
-
-        const maps = buildHierarchyMaps([...state.records, ...records]);
-        const enriched = enrichRecords(records, maps);
-        const merged = upsertRecords(state.records, enriched);
-
-        dispatch({ type: 'SET_RECORDS', records: merged, log, maps });
-        toast.success(`${file.name}: ${log.records_count} registros importados (${log.month_key})`);
+      const { records, log, crossMonthWarning } = await parseFile(file);
+      
+      if (crossMonthWarning) {
+        toast.warning(crossMonthWarning);
       }
+
+      // Use functional approach - dispatch handles merge in reducer
+      dispatch({ type: 'IMPORT_FILE', newRecords: records, log });
+      toast.success(`${file.name}: ${log.records_count} registros importados (${log.month_key})`);
     } catch (err: any) {
       toast.error(err.message || 'Erro ao processar arquivo');
     } finally {
       setProcessing(false);
     }
-  }, [state.records, dispatch]);
+  }, [dispatch]);
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
-  }, [handleFiles]);
+    Array.from(e.dataTransfer.files).forEach(f => handleFile(f));
+  }, [handleFile]);
 
   return (
     <div
@@ -54,7 +50,7 @@ export default function FileUpload() {
         input.accept = '.csv,.xlsx,.xls';
         input.onchange = (e) => {
           const files = (e.target as HTMLInputElement).files;
-          if (files) handleFiles(files);
+          if (files) Array.from(files).forEach(f => handleFile(f));
         };
         input.click();
       }}
@@ -94,6 +90,37 @@ export default function FileUpload() {
           ))}
         </div>
       )}
+
+      {/* Test data loader */}
+      <div className="mt-4 border-t border-border pt-4">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={async (e) => {
+            e.stopPropagation();
+            try {
+              setProcessing(true);
+              const urls = ['/test-jan.csv', '/test-fev.csv'];
+              for (const url of urls) {
+                const res = await fetch(url);
+                if (!res.ok) { toast.error(`Não encontrou ${url}`); continue; }
+                const blob = await res.blob();
+                const file = new File([blob], url.split('/').pop()!, { type: 'text/csv' });
+                await handleFile(file);
+              }
+              toast.success('Dados de teste carregados!');
+            } catch (err: any) {
+              toast.error(err.message);
+            } finally {
+              setProcessing(false);
+            }
+          }}
+        >
+          <FlaskConical className="h-4 w-4" />
+          Carregar dados de teste (Jan + Fev)
+        </Button>
+      </div>
     </div>
   );
 }

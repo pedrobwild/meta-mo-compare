@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, type ReactNode } from 'react';
 import type { AppState, MetaRecord, ImportLog, MonthlyTargets, FunnelData, TruthSource, AnalysisLevel, HierarchyMaps } from './types';
 import { getAvailableMonths, getPreviousMonth } from './calculations';
+import { upsertRecords, buildHierarchyMaps, enrichRecords } from './parser';
 
 const initialState: AppState = {
   records: [],
@@ -18,6 +19,7 @@ const initialState: AppState = {
 
 type Action =
   | { type: 'SET_RECORDS'; records: MetaRecord[]; log: ImportLog; maps: HierarchyMaps }
+  | { type: 'IMPORT_FILE'; newRecords: MetaRecord[]; log: ImportLog }
   | { type: 'SET_TRUTH_SOURCE'; source: TruthSource }
   | { type: 'SET_SELECTED_MONTH'; month: string }
   | { type: 'SET_COMPARISON_MONTH'; month: string }
@@ -42,6 +44,24 @@ function reducer(state: AppState, action: Action): AppState {
         records,
         importLogs: [...state.importLogs, action.log],
         hierarchyMaps: action.maps,
+        selectedMonth,
+        comparisonMonth: comparisonMonth && months.includes(comparisonMonth) ? comparisonMonth : months[1] || null,
+      };
+    }
+    case 'IMPORT_FILE': {
+      const maps = buildHierarchyMaps([...state.records, ...action.newRecords]);
+      const enriched = enrichRecords(action.newRecords, maps);
+      const records = upsertRecords(state.records, enriched);
+      const months = getAvailableMonths(records);
+      const selectedMonth = state.selectedMonth && months.includes(state.selectedMonth)
+        ? state.selectedMonth
+        : months[0] || null;
+      const comparisonMonth = selectedMonth ? getPreviousMonth(selectedMonth) : null;
+      return {
+        ...state,
+        records,
+        importLogs: [...state.importLogs, action.log],
+        hierarchyMaps: maps,
         selectedMonth,
         comparisonMonth: comparisonMonth && months.includes(comparisonMonth) ? comparisonMonth : months[1] || null,
       };
