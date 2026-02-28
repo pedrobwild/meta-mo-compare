@@ -9,10 +9,13 @@ import {
   formatPercent,
   getMonthLabel,
   computeFunnel,
+  METRIC_DEFS,
   type GroupedRow,
 } from '@/lib/calculations';
 import { FileText, Download, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function ReportView() {
   const { state } = useAppState();
@@ -32,7 +35,6 @@ export default function ReportView() {
 
     const rows = groupByLevel(current, previous, 'campaign', '', false);
 
-    // Top 3 positive highlights (weighted by spend)
     const highlights: { positive: string[]; negative: string[] } = { positive: [], negative: [] };
 
     const metricChecks = [
@@ -54,7 +56,6 @@ export default function ReportView() {
         else highlights.negative.push(text);
       }
 
-      // Top campaigns by improvement
       for (const row of rows.slice(0, 10)) {
         const d = row.delta.deltas['cost_per_result'];
         if (d && d.percent !== null) {
@@ -68,7 +69,6 @@ export default function ReportView() {
       }
     }
 
-    // Executive text
     const monthLabel = getMonthLabel(month);
     const compLabel = compMonth ? getMonthLabel(compMonth) : null;
     
@@ -80,14 +80,12 @@ export default function ReportView() {
       summary += ` Comparado a ${compLabel}, o investimento ${spendDelta > 0 ? 'aumentou' : 'diminuiu'} ${Math.abs(spendDelta).toFixed(1)}% e os resultados ${resultsDelta > 0 ? 'aumentaram' : 'diminuíram'} ${Math.abs(resultsDelta).toFixed(1)}%.`;
     }
 
-    // Funnel
     const funnel = state.funnelData.find(f => f.month_key === month);
     const funnelComputed = funnel ? computeFunnel(funnel, cm) : null;
     if (funnelComputed && funnelComputed.roas > 0) {
       summary += ` O ROAS foi de ${funnelComputed.roas.toFixed(2)}x com ticket médio de ${formatCurrency(funnelComputed.ticket_medio)}.`;
     }
 
-    // Recommendations
     const recommendations: string[] = [];
     if (cm.ctr_link < 1) recommendations.push('CTR Link abaixo de 1% — revisar criativos e copy dos anúncios');
     if (cm.frequency > 3) recommendations.push('Frequência alta (>' + cm.frequency.toFixed(1) + ') — considerar expandir público ou renovar criativos');
@@ -99,7 +97,7 @@ export default function ReportView() {
     }
     if (recommendations.length === 0) recommendations.push('Resultados estáveis — continuar otimizações incrementais');
 
-    return { summary, highlights, recommendations, cm, pm, monthLabel, compLabel };
+    return { summary, highlights, recommendations, cm, pm, monthLabel, compLabel, rows };
   }, [state, month, compMonth]);
 
   const exportCSV = () => {
@@ -122,6 +120,148 @@ export default function ReportView() {
     a.click();
   };
 
+  const exportPDF = () => {
+    if (!report || !month) return;
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    let y = 15;
+
+    // Title
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Meta Ads — Relatório MoM', 14, y);
+    y += 8;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100);
+    doc.text(`${report.monthLabel}${report.compLabel ? ` vs ${report.compLabel}` : ''}`, 14, y);
+    y += 10;
+
+    // KPIs table
+    doc.setTextColor(0);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('KPIs', 14, y);
+    y += 2;
+
+    const kpiData = METRIC_DEFS.slice(0, 10).map(def => {
+      const val = (report.cm as any)[def.key] ?? 0;
+      const prevVal = report.pm ? (report.pm as any)[def.key] ?? 0 : null;
+      const delta = prevVal !== null && prevVal !== 0
+        ? `${(((val - prevVal) / Math.abs(prevVal)) * 100).toFixed(1)}%`
+        : '—';
+      return [def.label, def.format(val), prevVal !== null ? def.format(prevVal) : '—', delta];
+    });
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Métrica', 'Atual', 'Anterior', 'Δ %']],
+      body: kpiData,
+      theme: 'grid',
+      headStyles: { fillColor: [30, 144, 255], textColor: 255, fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      margin: { left: 14, right: 14 },
+    });
+
+    y = (doc as any).lastAutoTable.finalY + 10;
+
+    // Summary
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Resumo Executivo', 14, y);
+    y += 6;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    const summaryLines = doc.splitTextToSize(report.summary, pageW - 28);
+    doc.text(summaryLines, 14, y);
+    y += summaryLines.length * 4.5 + 6;
+
+    // Highlights
+    if (report.highlights.positive.length > 0) {
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(34, 139, 34);
+      doc.text('✓ Destaques Positivos', 14, y);
+      y += 5;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0);
+      for (const h of report.highlights.positive.slice(0, 3)) {
+        const lines = doc.splitTextToSize(`• ${h}`, pageW - 28);
+        doc.text(lines, 16, y);
+        y += lines.length * 4 + 2;
+      }
+      y += 4;
+    }
+
+    if (report.highlights.negative.length > 0) {
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(220, 50, 50);
+      doc.text('⚠ Pontos de Atenção', 14, y);
+      y += 5;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0);
+      for (const h of report.highlights.negative.slice(0, 3)) {
+        const lines = doc.splitTextToSize(`• ${h}`, pageW - 28);
+        doc.text(lines, 16, y);
+        y += lines.length * 4 + 2;
+      }
+      y += 4;
+    }
+
+    // Recommendations
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 100, 200);
+    doc.text('Recomendações', 14, y);
+    y += 5;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0);
+    for (let i = 0; i < report.recommendations.length; i++) {
+      const lines = doc.splitTextToSize(`${i + 1}. ${report.recommendations[i]}`, pageW - 28);
+      doc.text(lines, 16, y);
+      y += lines.length * 4 + 2;
+    }
+
+    // Campaign table on next page if needed
+    if (y > 240) doc.addPage();
+    else y += 8;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0);
+    doc.text('Ranking por Campanha', 14, y);
+    y += 2;
+
+    const campData = report.rows.map(r => [
+      r.name.substring(0, 30),
+      formatCurrency(r.metrics.spend_brl),
+      formatNumber(r.metrics.impressions),
+      formatNumber(r.metrics.link_clicks),
+      formatPercent(r.metrics.ctr_link),
+      formatCurrency(r.metrics.cpc_link),
+      formatNumber(r.metrics.results),
+      formatCurrency(r.metrics.cost_per_result),
+    ]);
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Campanha', 'Invest.', 'Impr.', 'Cliques', 'CTR', 'CPC', 'Result.', 'CPA']],
+      body: campData,
+      theme: 'grid',
+      headStyles: { fillColor: [30, 144, 255], textColor: 255, fontSize: 8 },
+      bodyStyles: { fontSize: 7 },
+      columnStyles: { 0: { cellWidth: 40 } },
+      margin: { left: 14, right: 14 },
+    });
+
+    doc.save(`relatorio-meta-ads-${month}.pdf`);
+  };
+
   if (!report) return <p className="text-muted-foreground text-center py-8">Selecione um mês</p>;
 
   return (
@@ -132,9 +272,14 @@ export default function ReportView() {
           Relatório — {report.monthLabel}
           {report.compLabel && <span className="text-muted-foreground font-normal text-sm">vs {report.compLabel}</span>}
         </h2>
-        <Button variant="outline" size="sm" onClick={exportCSV}>
-          <Download className="h-4 w-4 mr-1" /> CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={exportCSV}>
+            <Download className="h-4 w-4 mr-1" /> CSV
+          </Button>
+          <Button size="sm" onClick={exportPDF}>
+            <Download className="h-4 w-4 mr-1" /> PDF
+          </Button>
+        </div>
       </div>
 
       {/* Summary */}
