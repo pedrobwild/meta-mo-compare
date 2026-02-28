@@ -14,7 +14,201 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      funnel_data: {
+        Row: {
+          created_at: string
+          id: string
+          month_key: string
+          mql: number
+          receita: number
+          sql_count: number
+          updated_at: string
+          vendas: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          month_key: string
+          mql?: number
+          receita?: number
+          sql_count?: number
+          updated_at?: string
+          vendas?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          month_key?: string
+          mql?: number
+          receita?: number
+          sql_count?: number
+          updated_at?: string
+          vendas?: number
+        }
+        Relationships: []
+      }
+      meta_records: {
+        Row: {
+          ad_key: string
+          ad_name: string
+          adset_key: string | null
+          adset_name: string | null
+          campaign_key: string | null
+          campaign_name: string | null
+          clicks_all: number
+          cost_per_lpv: number
+          cost_per_result: number
+          cpc_all: number
+          cpc_link: number
+          cpm: number
+          created_at: string
+          ctr_all: number
+          ctr_link: number
+          delivery_level: string | null
+          delivery_status: string | null
+          frequency: number
+          id: string
+          impressions: number
+          landing_page_views: number
+          link_clicks: number
+          month_key: string
+          reach: number
+          report_end: string | null
+          report_start: string | null
+          result_type: string | null
+          results: number
+          source_type: string
+          spend_brl: number
+          unique_key: string
+        }
+        Insert: {
+          ad_key: string
+          ad_name: string
+          adset_key?: string | null
+          adset_name?: string | null
+          campaign_key?: string | null
+          campaign_name?: string | null
+          clicks_all?: number
+          cost_per_lpv?: number
+          cost_per_result?: number
+          cpc_all?: number
+          cpc_link?: number
+          cpm?: number
+          created_at?: string
+          ctr_all?: number
+          ctr_link?: number
+          delivery_level?: string | null
+          delivery_status?: string | null
+          frequency?: number
+          id?: string
+          impressions?: number
+          landing_page_views?: number
+          link_clicks?: number
+          month_key: string
+          reach?: number
+          report_end?: string | null
+          report_start?: string | null
+          result_type?: string | null
+          results?: number
+          source_type?: string
+          spend_brl?: number
+          unique_key: string
+        }
+        Update: {
+          ad_key?: string
+          ad_name?: string
+          adset_key?: string | null
+          adset_name?: string | null
+          campaign_key?: string | null
+          campaign_name?: string | null
+          clicks_all?: number
+          cost_per_lpv?: number
+          cost_per_result?: number
+          cpc_all?: number
+          cpc_link?: number
+          cpm?: number
+          created_at?: string
+          ctr_all?: number
+          ctr_link?: number
+          delivery_level?: string | null
+          delivery_status?: string | null
+          frequency?: number
+          id?: string
+          impressions?: number
+          landing_page_views?: number
+          link_clicks?: number
+          month_key?: string
+          reach?: number
+          report_end?: string | null
+          report_start?: string | null
+          result_type?: string | null
+          results?: number
+          source_type?: string
+          spend_brl?: number
+          unique_key?: string
+        }
+        Relationships: []
+      }
+      monthly_targets: {
+        Row: {
+          cost_per_lpv: number | null
+          cost_per_result: number | null
+          cpc_link: number | null
+          cpm: number | null
+          created_at: string
+          ctr_link: number | null
+          id: string
+          lpv: number | null
+          month_key: string
+          mql: number | null
+          receita: number | null
+          results: number | null
+          roas: number | null
+          spend: number | null
+          sql_target: number | null
+          updated_at: string
+          vendas: number | null
+        }
+        Insert: {
+          cost_per_lpv?: number | null
+          cost_per_result?: number | null
+          cpc_link?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr_link?: number | null
+          id?: string
+          lpv?: number | null
+          month_key: string
+          mql?: number | null
+          receita?: number | null
+          results?: number | null
+          roas?: number | null
+          spend?: number | null
+          sql_target?: number | null
+          updated_at?: string
+          vendas?: number | null
+        }
+        Update: {
+          cost_per_lpv?: number | null
+          cost_per_result?: number | null
+          cpc_link?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr_link?: number | null
+          id?: string
+          lpv?: number | null
+          month_key?: string
+          mql?: number | null
+          receita?: number | null
+          results?: number | null
+          roas?: number | null
+          spend?: number | null
+          sql_target?: number | null
+          updated_at?: string
+          vendas?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

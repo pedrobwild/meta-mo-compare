@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useReducer, type ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef, type ReactNode } from 'react';
 import type { AppState, MetaRecord, ImportLog, MonthlyTargets, FunnelData, TruthSource, AnalysisLevel, HierarchyMaps } from './types';
 import { getAvailableMonths, getPreviousMonth } from './calculations';
 import { upsertRecords, buildHierarchyMaps, enrichRecords } from './parser';
+import { loadRecords, saveRecords, loadTargets, saveTarget, loadFunnelData, saveFunnel, clearAllData } from './persistence';
 
 const initialState: AppState = {
   records: [],
@@ -28,10 +29,27 @@ type Action =
   | { type: 'SET_INCLUDE_INACTIVE'; value: boolean }
   | { type: 'SET_TARGETS'; targets: MonthlyTargets }
   | { type: 'SET_FUNNEL'; funnel: FunnelData }
-  | { type: 'CLEAR_ALL' };
+  | { type: 'CLEAR_ALL' }
+  | { type: 'HYDRATE'; records: MetaRecord[]; targets: MonthlyTargets[]; funnelData: FunnelData[] };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
+    case 'HYDRATE': {
+      const records = action.records;
+      const maps = buildHierarchyMaps(records);
+      const months = getAvailableMonths(records);
+      const selectedMonth = months[0] || null;
+      const comparisonMonth = selectedMonth ? getPreviousMonth(selectedMonth) : null;
+      return {
+        ...state,
+        records,
+        targets: action.targets,
+        funnelData: action.funnelData,
+        hierarchyMaps: maps,
+        selectedMonth,
+        comparisonMonth: comparisonMonth && months.includes(comparisonMonth) ? comparisonMonth : months[1] || null,
+      };
+    }
     case 'SET_RECORDS': {
       const records = action.records;
       const months = getAvailableMonths(records);
@@ -93,13 +111,55 @@ function reducer(state: AppState, action: Action): AppState {
   }
 }
 
+// Middleware wrapper to persist side effects
+function usePersistingDispatch(dispatch: React.Dispatch<Action>) {
+  return React.useCallback((action: Action) => {
+    dispatch(action);
+
+    // Fire-and-forget persistence
+    switch (action.type) {
+      case 'SET_RECORDS':
+        saveRecords(action.records);
+        break;
+      case 'IMPORT_FILE':
+        saveRecords(action.newRecords);
+        break;
+      case 'SET_TARGETS':
+        saveTarget(action.targets);
+        break;
+      case 'SET_FUNNEL':
+        saveFunnel(action.funnel);
+        break;
+      case 'CLEAR_ALL':
+        clearAllData();
+        break;
+    }
+  }, [dispatch]);
+}
+
 const AppContext = createContext<{
   state: AppState;
   dispatch: React.Dispatch<Action>;
 } | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [state, rawDispatch] = useReducer(reducer, initialState);
+  const dispatch = usePersistingDispatch(rawDispatch);
+  const hydrated = useRef(false);
+
+  useEffect(() => {
+    if (hydrated.current) return;
+    hydrated.current = true;
+
+    Promise.all([loadRecords(), loadTargets(), loadFunnelData()]).then(
+      ([records, targets, funnelData]) => {
+        if (records.length > 0 || targets.length > 0 || funnelData.length > 0) {
+          rawDispatch({ type: 'HYDRATE', records, targets, funnelData });
+        }
+      }
+    );
+  }, []);
+
   return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
 }
 
