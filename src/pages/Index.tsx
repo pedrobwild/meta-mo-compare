@@ -5,6 +5,7 @@ import FileUploadComponent from '@/components/FileUpload';
 import GlobalFilters from '@/components/GlobalFilters';
 import OverviewCards from '@/components/OverviewCards';
 import RankingTable from '@/components/RankingTable';
+import OverviewCharts from '@/components/OverviewCharts';
 import FunnelView from '@/components/FunnelView';
 import ReportView from '@/components/ReportView';
 import DataHealthView from '@/components/DataHealthView';
@@ -88,6 +89,7 @@ function DashboardContent() {
             <GlobalFilters />
             <TargetsEditor />
             <OverviewCards />
+            <OverviewCharts />
             <RankingTable />
           </>
         )}
