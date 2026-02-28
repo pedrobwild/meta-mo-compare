@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState, Fragment } from 'react';
 import { useAppState } from '@/lib/store';
 import {
   filterByTruthSourceWithFallback,
@@ -118,7 +118,7 @@ export default function RankingTable() {
     const indent = depth * 24;
 
     return (
-      <React.Fragment key={`${depth}-${row.key}`}>
+      <Fragment key={`${depth}-${row.key}`}>
         <tr
           className={`border-b border-border/50 hover:bg-secondary/50 transition-colors ${showExpander ? 'cursor-pointer' : ''} ${depth > 0 ? 'bg-secondary/20' : ''}`}
           onClick={showExpander ? () => toggleExpand(row.key) : undefined}
@@ -155,7 +155,7 @@ export default function RankingTable() {
           }
           return renderRow(child, 1);
         })}
-      </React.Fragment>
+      </Fragment>
     );
   };
 
@@ -164,7 +164,7 @@ export default function RankingTable() {
     const indent = depth * 24;
 
     return (
-      <React.Fragment key={`adset-${row.key}`}>
+      <Fragment key={`adset-${row.key}`}>
         <tr
           className="border-b border-border/50 hover:bg-secondary/50 transition-colors cursor-pointer bg-secondary/20"
           onClick={() => {
@@ -194,7 +194,7 @@ export default function RankingTable() {
           ))}
         </tr>
         {isExpanded && getChildren(row.key, 'adset').map(child => renderRow(child, 2))}
-      </React.Fragment>
+      </Fragment>
     );
   };
 
