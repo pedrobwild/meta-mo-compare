@@ -1,6 +1,6 @@
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import type { MetaRecord, SourceType, ImportLog, HierarchyMaps } from './types';
+import type { MetaRecord, SourceType, ImportLog, HierarchyMaps, PeriodGranularity } from './types';
 
 const COLUMN_MAP: Record<string, keyof MetaRecord> = {
   'Nome do anúncio': 'ad_name',
@@ -78,6 +78,28 @@ function extractMonthKey(dateStr: string | null): string {
   return 'unknown';
 }
 
+// Detect granularity from period_start and period_end
+function detectGranularity(start: string, end: string): PeriodGranularity {
+  return start === end ? 'day' : 'week';
+}
+
+// Generate ISO week key from a date string
+function getISOWeekKey(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  // ISO week: Monday is first day
+  const dayOfWeek = d.getDay() || 7; // Sunday=7
+  d.setDate(d.getDate() + 4 - dayOfWeek); // Thursday of this week
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${d.getFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+// Generate period_key based on granularity
+function generatePeriodKey(start: string, granularity: PeriodGranularity): string {
+  if (granularity === 'day') return start; // "YYYY-MM-DD"
+  return getISOWeekKey(start); // "YYYY-Www"
+}
+
 function mapRow(row: Record<string, any>, sourceType: SourceType): MetaRecord | null {
   const mapped: any = {};
   for (const [ptCol, field] of Object.entries(COLUMN_MAP)) {
@@ -94,15 +116,38 @@ function mapRow(row: Record<string, any>, sourceType: SourceType): MetaRecord | 
 
   const report_start = parseDate(mapped.report_start);
   const report_end = parseDate(mapped.report_end);
-  const month_key = extractMonthKey(report_start);
+
+  // Period fields
+  const period_start = report_start || 'unknown';
+  const period_end = report_end || period_start;
+  const granularity = period_start !== 'unknown' && period_end !== 'unknown'
+    ? detectGranularity(period_start, period_end)
+    : 'week';
+  const period_key = period_start !== 'unknown'
+    ? generatePeriodKey(period_start, granularity)
+    : 'unknown';
+
+  // Legacy month_key derived from period_start
+  const month_key = extractMonthKey(period_start);
 
   const ad_key = normalize(ad_name);
   const campaign_key = campaign_name ? normalize(campaign_name) : null;
   const adset_key = adset_name ? normalize(adset_name) : null;
 
-  const unique_key = [month_key, ad_key, campaign_key || '', adset_key || '', sourceType].join('|');
+  // Robust unique_key: normalized identity + level
+  const unique_key = [
+    ad_key,
+    campaign_key || '',
+    adset_key || '',
+    sourceType,
+    mapped.delivery_level || '',
+  ].join('|');
 
   return {
+    period_start,
+    period_end,
+    period_key,
+    granularity,
     month_key,
     ad_key,
     campaign_key,
@@ -135,25 +180,12 @@ function mapRow(row: Record<string, any>, sourceType: SourceType): MetaRecord | 
   };
 }
 
-function checkCrossMonth(records: MetaRecord[]): string | null {
-  for (const r of records) {
-    if (r.report_start && r.report_end) {
-      const startMonth = extractMonthKey(r.report_start);
-      const endMonth = extractMonthKey(r.report_end);
-      if (startMonth !== endMonth) {
-        return `Período cruza meses (${r.report_start} a ${r.report_end}). Importe relatórios separados por mês.`;
-      }
-    }
-  }
-  return null;
-}
-
 export async function parseFile(file: File): Promise<{
   records: MetaRecord[];
   sourceType: SourceType;
-  monthKey: string;
+  periodKey: string;
+  granularity: PeriodGranularity;
   log: ImportLog;
-  crossMonthWarning: string | null;
 }> {
   const ext = file.name.split('.').pop()?.toLowerCase();
   let rows: Record<string, any>[];
@@ -188,28 +220,31 @@ export async function parseFile(file: File): Promise<{
     if (record) records.push(record);
   }
 
-  const crossMonthWarning = checkCrossMonth(records);
-  const monthKeys = [...new Set(records.map(r => r.month_key))];
-  const monthKey = monthKeys[0] || 'unknown';
+  const periodKeys = [...new Set(records.map(r => r.period_key))];
+  const periodKey = periodKeys[0] || 'unknown';
+  const granularity = records[0]?.granularity || 'week';
 
   const log: ImportLog = {
     id: crypto.randomUUID(),
     timestamp: new Date(),
     filename: file.name,
     source_type: sourceType,
-    month_key: monthKey,
+    period_key: periodKey,
+    granularity,
     records_count: records.length,
-    status: crossMonthWarning ? 'warning' : 'success',
-    message: crossMonthWarning || `${records.length} registros importados (${sourceType})`,
+    status: 'success',
+    message: `${records.length} registros importados (${sourceType}, ${periodKey})`,
   };
 
-  return { records, sourceType, monthKey, log, crossMonthWarning };
+  return { records, sourceType, periodKey, granularity, log };
 }
 
 export function upsertRecords(existing: MetaRecord[], incoming: MetaRecord[]): MetaRecord[] {
   const map = new Map<string, MetaRecord>();
-  for (const r of existing) map.set(r.unique_key, r);
-  for (const r of incoming) map.set(r.unique_key, r);
+  // Key by unique_key + period_key + granularity for proper dedup
+  const makeKey = (r: MetaRecord) => `${r.unique_key}|${r.period_key}|${r.granularity}`;
+  for (const r of existing) map.set(makeKey(r), r);
+  for (const r of incoming) map.set(makeKey(r), r);
   return Array.from(map.values());
 }
 
@@ -218,7 +253,6 @@ export function buildHierarchyMaps(records: MetaRecord[]): HierarchyMaps {
   const ad_to_campaign: Record<string, string> = {};
   const adset_to_campaign: Record<string, string> = {};
 
-  // Prefer type3 records
   const sorted = [...records].sort((a, b) => {
     const order: Record<string, number> = { type3_full: 0, type2_ad_campaign: 1, type1_ad_only: 2 };
     return (order[a.source_type] || 2) - (order[b.source_type] || 2);

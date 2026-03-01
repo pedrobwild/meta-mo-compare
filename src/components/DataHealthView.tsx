@@ -27,6 +27,9 @@ export default function DataHealthView() {
       }
     }
 
+    const periods = [...new Set(state.records.map(r => r.period_key))];
+    const granularities = [...new Set(state.records.map(r => r.granularity))];
+
     return {
       totalAds: ads.size,
       withCampaign: adsWithCampaign.size,
@@ -34,6 +37,9 @@ export default function DataHealthView() {
       pctCampaign: ads.size > 0 ? (adsWithCampaign.size / ads.size) * 100 : 0,
       pctAdset: ads.size > 0 ? (adsWithAdset.size / ads.size) * 100 : 0,
       orphans: orphans.slice(0, 20),
+      totalPeriods: periods.length,
+      granularities,
+      totalRecords: state.records.length,
     };
   }, [state.records]);
 
@@ -45,10 +51,14 @@ export default function DataHealthView() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="glass-card p-4 text-center">
-          <p className="text-xs text-muted-foreground">Total Anúncios</p>
-          <p className="text-2xl font-bold text-foreground">{health.totalAds}</p>
+          <p className="text-xs text-muted-foreground">Total Registros</p>
+          <p className="text-2xl font-bold text-foreground">{health.totalRecords}</p>
+        </div>
+        <div className="glass-card p-4 text-center">
+          <p className="text-xs text-muted-foreground">Períodos</p>
+          <p className="text-2xl font-bold text-foreground">{health.totalPeriods}</p>
         </div>
         <div className="glass-card p-4 text-center">
           <p className="text-xs text-muted-foreground">Com Campanha</p>
@@ -67,11 +77,16 @@ export default function DataHealthView() {
       </div>
 
       <div className="glass-card p-4">
-        <p className="text-xs text-muted-foreground mb-2">Fontes importadas</p>
+        <p className="text-xs text-muted-foreground mb-2">Fontes & Granularidades</p>
         <div className="flex gap-2 flex-wrap">
           {sources.map(s => (
             <span key={s} className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded">
               {s === 'type3_full' ? 'Full Hierarchy' : s === 'type2_ad_campaign' ? 'Ad + Campanha' : 'Ad Only'}
+            </span>
+          ))}
+          {health.granularities.map(g => (
+            <span key={g} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+              {g === 'week' ? 'Semanal' : 'Diário'}
             </span>
           ))}
         </div>

@@ -1,4 +1,4 @@
-import type { MetaRecord, AggregatedMetrics, DeltaMetrics, AnalysisLevel, TruthSource, FunnelData } from './types';
+import type { MetaRecord, AggregatedMetrics, DeltaMetrics, AnalysisLevel, TruthSource, FunnelData, PeriodGranularity, PeriodKey } from './types';
 
 export function aggregateMetrics(records: MetaRecord[]): AggregatedMetrics {
   const sum = (fn: (r: MetaRecord) => number) => records.reduce((acc, r) => acc + fn(r), 0);
@@ -27,6 +27,10 @@ export function aggregateMetrics(records: MetaRecord[]): AggregatedMetrics {
     frequency: reach > 0 ? impressions / reach : 0,
     ctr_all: impressions > 0 ? (clicks_all / impressions) * 100 : 0,
     cpc_all: clicks_all > 0 ? spend_brl / clicks_all : 0,
+    // Derived metrics
+    lpv_rate: link_clicks > 0 ? landing_page_views / link_clicks : 0,
+    qualified_ctr: impressions > 0 ? (landing_page_views / impressions) * 100 : 0,
+    result_per_lpv: landing_page_views > 0 ? results / landing_page_views : 0,
   };
 }
 
@@ -45,14 +49,29 @@ export function computeDeltas(current: AggregatedMetrics, previous: AggregatedMe
   return { current, previous, deltas };
 }
 
-export function filterRecordsByMonth(
+// === Period-based filtering ===
+
+export function filterRecordsByPeriod(
   records: MetaRecord[],
-  monthKey: string,
+  periodKey: string,
   truthSource: TruthSource
 ): MetaRecord[] {
-  return records.filter(r => r.month_key === monthKey && r.source_type === truthSource);
+  return records.filter(r => r.period_key === periodKey && r.source_type === truthSource);
 }
 
+export function filterByPeriodWithFallback(
+  records: MetaRecord[],
+  periodKey: string,
+  truthSource: TruthSource
+): MetaRecord[] {
+  let filtered = records.filter(r => r.period_key === periodKey && r.source_type === truthSource);
+  if (filtered.length === 0) {
+    filtered = records.filter(r => r.period_key === periodKey);
+  }
+  return filtered;
+}
+
+// Legacy month-based (kept for compatibility during migration)
 export function filterByTruthSourceWithFallback(
   records: MetaRecord[],
   monthKey: string,
@@ -60,7 +79,6 @@ export function filterByTruthSourceWithFallback(
 ): MetaRecord[] {
   let filtered = records.filter(r => r.month_key === monthKey && r.source_type === truthSource);
   if (filtered.length === 0) {
-    // Fallback: try any source
     filtered = records.filter(r => r.month_key === monthKey);
   }
   return filtered;
@@ -98,7 +116,6 @@ export function groupByLevel(
     }
   };
 
-  // Group current
   const currentGroups = new Map<string, MetaRecord[]>();
   for (const r of currentRecords) {
     const key = getKey(r);
@@ -106,7 +123,6 @@ export function groupByLevel(
     currentGroups.get(key)!.push(r);
   }
 
-  // Group previous
   const prevGroups = new Map<string, MetaRecord[]>();
   for (const r of previousRecords) {
     const key = getKey(r);
@@ -117,7 +133,6 @@ export function groupByLevel(
   const rows: GroupedRow[] = [];
   for (const [key, recs] of currentGroups) {
     const metrics = aggregateMetrics(recs);
-    
     if (!includeInactive && metrics.spend_brl === 0 && metrics.impressions === 0) continue;
 
     const name = getName(recs[0]);
@@ -156,6 +171,47 @@ export function computeFunnel(
   };
 }
 
+// === Period utilities ===
+
+export function getAvailablePeriods(records: MetaRecord[], granularity?: PeriodGranularity): string[] {
+  const filtered = granularity ? records.filter(r => r.granularity === granularity) : records;
+  const periods = [...new Set(filtered.map(r => r.period_key))];
+  return periods.sort().reverse();
+}
+
+export function getAvailableGranularities(records: MetaRecord[]): PeriodGranularity[] {
+  const granularities = new Set(records.map(r => r.granularity));
+  const result: PeriodGranularity[] = [];
+  if (granularities.has('day')) result.push('day');
+  if (granularities.has('week')) result.push('week');
+  return result;
+}
+
+export function detectDefaultGranularity(records: MetaRecord[]): PeriodGranularity {
+  const hasDay = records.some(r => r.granularity === 'day');
+  return hasDay ? 'day' : 'week';
+}
+
+export function getPreviousPeriod(periodKey: string, granularity: PeriodGranularity): string {
+  if (granularity === 'day') {
+    const d = new Date(periodKey);
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }
+  // Week: "YYYY-Www" -> previous week
+  const match = periodKey.match(/^(\d{4})-W(\d{2})$/);
+  if (match) {
+    const year = parseInt(match[1]);
+    const week = parseInt(match[2]);
+    if (week <= 1) {
+      return `${year - 1}-W52`;
+    }
+    return `${year}-W${String(week - 1).padStart(2, '0')}`;
+  }
+  return periodKey;
+}
+
+// Legacy
 export function getAvailableMonths(records: MetaRecord[]): string[] {
   const months = [...new Set(records.map(r => r.month_key))].filter(m => m !== 'unknown');
   return months.sort().reverse();
@@ -179,6 +235,19 @@ export function formatPercent(value: number, decimals = 2): string {
   return `${value.toFixed(decimals)}%`;
 }
 
+export function getPeriodLabel(periodKey: string, granularity: PeriodGranularity): string {
+  if (granularity === 'day') {
+    const d = new Date(periodKey + 'T00:00:00');
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  // Week: "YYYY-Www"
+  const match = periodKey.match(/^(\d{4})-W(\d{2})$/);
+  if (match) {
+    return `Sem ${match[2]}/${match[1]}`;
+  }
+  return periodKey;
+}
+
 export function getMonthLabel(monthKey: string): string {
   const [year, month] = monthKey.split('-').map(Number);
   const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -190,14 +259,14 @@ export interface MetricDef {
   key: string;
   label: string;
   format: (v: number) => string;
-  invertDelta?: boolean; // true = lower is better (cost metrics)
+  invertDelta?: boolean;
 }
 
 export const METRIC_DEFS: MetricDef[] = [
   { key: 'spend_brl', label: 'Investimento', format: formatCurrency },
   { key: 'impressions', label: 'Impressões', format: v => formatNumber(v) },
   { key: 'link_clicks', label: 'Cliques no Link', format: v => formatNumber(v) },
-  { key: 'ctr_link', label: 'CTR Link', format: v => formatPercent(v), },
+  { key: 'ctr_link', label: 'CTR Link', format: v => formatPercent(v) },
   { key: 'cpc_link', label: 'CPC Link', format: formatCurrency, invertDelta: true },
   { key: 'cpm', label: 'CPM', format: formatCurrency, invertDelta: true },
   { key: 'results', label: 'Resultados', format: v => formatNumber(v) },
@@ -206,4 +275,47 @@ export const METRIC_DEFS: MetricDef[] = [
   { key: 'cost_per_lpv', label: 'Custo/LPV', format: formatCurrency, invertDelta: true },
   { key: 'reach', label: 'Alcance', format: v => formatNumber(v) },
   { key: 'frequency', label: 'Frequência', format: v => formatNumber(v, 2) },
+  { key: 'lpv_rate', label: 'LPV Rate', format: v => formatPercent(v * 100) },
+  { key: 'qualified_ctr', label: 'Qualified CTR', format: v => formatPercent(v) },
+  { key: 'result_per_lpv', label: 'Result/LPV', format: v => formatPercent(v * 100) },
 ];
+
+// Identify top drivers of change between periods
+export interface DriverChange {
+  key: string;
+  label: string;
+  current: number;
+  previous: number;
+  percentChange: number;
+  absoluteChange: number;
+  impact: 'positive' | 'negative';
+}
+
+export function identifyDrivers(delta: DeltaMetrics, limit = 5): DriverChange[] {
+  const driverKeys = ['cpm', 'ctr_link', 'cpc_link', 'lpv_rate', 'cost_per_result', 'cost_per_lpv', 'qualified_ctr', 'result_per_lpv', 'frequency'];
+  const invertKeys = new Set(['cpm', 'cpc_link', 'cost_per_result', 'cost_per_lpv']);
+
+  if (!delta.previous) return [];
+
+  const drivers: DriverChange[] = [];
+  for (const key of driverKeys) {
+    const d = delta.deltas[key];
+    if (!d || d.percent === null || Math.abs(d.percent) < 1) continue;
+
+    const def = METRIC_DEFS.find(m => m.key === key);
+    const isInverted = invertKeys.has(key);
+    const isPositive = isInverted ? d.absolute < 0 : d.absolute > 0;
+
+    drivers.push({
+      key,
+      label: def?.label || key,
+      current: delta.current[key as keyof AggregatedMetrics],
+      previous: delta.previous[key as keyof AggregatedMetrics],
+      percentChange: d.percent,
+      absoluteChange: d.absolute,
+      impact: isPositive ? 'positive' : 'negative',
+    });
+  }
+
+  return drivers.sort((a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange)).slice(0, limit);
+}
