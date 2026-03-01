@@ -3,6 +3,9 @@ import { Cloud, BarChart3, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppProvider, useAppState } from '@/lib/store';
 import { useWorkspace } from '@/lib/workspace';
+import { CrossFilterProvider, useCrossFilter } from '@/lib/crossFilter';
+import { Badge } from '@/components/ui/badge';
+import { X } from 'lucide-react';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar, type Tab } from '@/components/AppSidebar';
 import CommandHeader from '@/components/CommandHeader';
@@ -84,6 +87,7 @@ function DashboardContent() {
   const { user, loading: wsLoading } = useWorkspace();
   const [activeTab, setActiveTab] = useState<Tab>('executive');
   const hasData = state.records.length > 0;
+  const { filter: crossFilter, clearFilter } = useCrossFilter();
 
   // Show auth if not logged in
   if (wsLoading) {
@@ -111,6 +115,14 @@ function DashboardContent() {
           <CommandHeader />
 
           <main className="flex-1 p-4 overflow-y-auto">
+            {crossFilter.key && (
+              <div className="mb-3 flex items-center gap-2">
+                <Badge variant="secondary" className="text-xs flex items-center gap-1.5 px-2.5 py-1">
+                  Filtrando: <span className="font-semibold">{crossFilter.name}</span>
+                  <button onClick={clearFilter} className="ml-1 hover:text-destructive"><X className="h-3 w-3" /></button>
+                </Badge>
+              </div>
+            )}
             {!hasData && activeTab === 'executive' && <EmptyState />}
 
             <AnimatePresence mode="wait">
@@ -187,7 +199,9 @@ function DashboardContent() {
 
 const Index = () => (
   <AppProvider>
-    <DashboardContent />
+    <CrossFilterProvider>
+      <DashboardContent />
+    </CrossFilterProvider>
   </AppProvider>
 );
 

@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useAppState, useFilteredRecords } from '@/lib/store';
+import { useCrossFilter } from '@/lib/crossFilter';
 import {
   aggregateMetrics,
   groupByLevel,
@@ -62,6 +63,7 @@ const LEVEL_LABELS: Record<string, string> = {
 export default function HeatmapTable() {
   const { state } = useAppState();
   const { current: currentRecords, previous: previousRecords } = useFilteredRecords();
+  const { setFilter } = useCrossFilter();
   const [sortKey, setSortKey] = useState<SortKey>('spend_brl');
   const [sortAsc, setSortAsc] = useState(false);
   const [drillPath, setDrillPath] = useState<BreadcrumbLevel[]>([]);
@@ -127,11 +129,17 @@ export default function HeatmapTable() {
   const canDrillDown = currentLevel !== 'ad';
 
   const handleDrill = useCallback((row: GroupedRow) => {
-    if (!canDrillDown) return;
+    if (!canDrillDown) {
+      // At ad level, emit cross-filter
+      setFilter({ level: currentLevel as any, key: row.key, name: row.name });
+      return;
+    }
+    // Emit cross-filter for the entity being drilled into
+    setFilter({ level: currentLevel as any, key: row.key, name: row.name });
     setDrillPath(prev => [...prev, { level: currentLevel as 'campaign' | 'adset', key: row.key, name: row.name }]);
     setSortKey('spend_brl');
     setSortAsc(false);
-  }, [canDrillDown, currentLevel]);
+  }, [canDrillDown, currentLevel, setFilter]);
 
   const handleBreadcrumbClick = useCallback((index: number) => {
     // index = -1 means root

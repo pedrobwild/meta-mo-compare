@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useAppState, useFilteredRecords } from '@/lib/store';
+import { useCrossFilter } from '@/lib/crossFilter';
 import {
   aggregateMetrics,
   computeDeltas,
@@ -12,7 +13,29 @@ import { TrendingUp, TrendingDown, Zap } from 'lucide-react';
 
 export default function OverviewCards() {
   const { state } = useAppState();
-  const { current, previous } = useFilteredRecords();
+  const { current: rawCurrent, previous: rawPrevious } = useFilteredRecords();
+  const { filter: crossFilter } = useCrossFilter();
+
+  // Apply cross-filter
+  const current = useMemo(() => {
+    if (!crossFilter.key || !crossFilter.level) return rawCurrent;
+    return rawCurrent.filter(r => {
+      if (crossFilter.level === 'campaign') return (r.campaign_key || 'sem-campanha') === crossFilter.key;
+      if (crossFilter.level === 'adset') return (r.adset_key || 'sem-conjunto') === crossFilter.key;
+      if (crossFilter.level === 'ad') return r.ad_key === crossFilter.key;
+      return true;
+    });
+  }, [rawCurrent, crossFilter]);
+
+  const previous = useMemo(() => {
+    if (!crossFilter.key || !crossFilter.level) return rawPrevious;
+    return rawPrevious.filter(r => {
+      if (crossFilter.level === 'campaign') return (r.campaign_key || 'sem-campanha') === crossFilter.key;
+      if (crossFilter.level === 'adset') return (r.adset_key || 'sem-conjunto') === crossFilter.key;
+      if (crossFilter.level === 'ad') return r.ad_key === crossFilter.key;
+      return true;
+    });
+  }, [rawPrevious, crossFilter]);
 
   const data = useMemo(() => {
     if (current.length === 0) return null;

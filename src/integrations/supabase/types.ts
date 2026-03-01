@@ -361,6 +361,135 @@ export type Database = {
           },
         ]
       }
+      facts_meta_insights_daily: {
+        Row: {
+          actions_json: Json | null
+          ad_account_id: string
+          ad_id: string | null
+          add_to_cart: number
+          adset_id: string | null
+          age: string | null
+          attribution_setting: string | null
+          campaign_id: string | null
+          clicks: number
+          country: string | null
+          cpa_lead: number | null
+          cpc_link: number | null
+          cpm: number | null
+          created_at: string
+          creative_id: string | null
+          ctr_link: number | null
+          date: string
+          device_platform: string | null
+          frequency: number | null
+          gender: string | null
+          id: string
+          impressions: number
+          initiate_checkout: number
+          inline_link_clicks: number
+          landing_page_views: number
+          level: string
+          placement: string | null
+          publisher_platform: string | null
+          purchase_value: number
+          purchases: number
+          reach: number
+          results_leads: number
+          roas: number | null
+          spend: number
+          workspace_id: string
+        }
+        Insert: {
+          actions_json?: Json | null
+          ad_account_id: string
+          ad_id?: string | null
+          add_to_cart?: number
+          adset_id?: string | null
+          age?: string | null
+          attribution_setting?: string | null
+          campaign_id?: string | null
+          clicks?: number
+          country?: string | null
+          cpa_lead?: number | null
+          cpc_link?: number | null
+          cpm?: number | null
+          created_at?: string
+          creative_id?: string | null
+          ctr_link?: number | null
+          date: string
+          device_platform?: string | null
+          frequency?: number | null
+          gender?: string | null
+          id?: string
+          impressions?: number
+          initiate_checkout?: number
+          inline_link_clicks?: number
+          landing_page_views?: number
+          level?: string
+          placement?: string | null
+          publisher_platform?: string | null
+          purchase_value?: number
+          purchases?: number
+          reach?: number
+          results_leads?: number
+          roas?: number | null
+          spend?: number
+          workspace_id: string
+        }
+        Update: {
+          actions_json?: Json | null
+          ad_account_id?: string
+          ad_id?: string | null
+          add_to_cart?: number
+          adset_id?: string | null
+          age?: string | null
+          attribution_setting?: string | null
+          campaign_id?: string | null
+          clicks?: number
+          country?: string | null
+          cpa_lead?: number | null
+          cpc_link?: number | null
+          cpm?: number | null
+          created_at?: string
+          creative_id?: string | null
+          ctr_link?: number | null
+          date?: string
+          device_platform?: string | null
+          frequency?: number | null
+          gender?: string | null
+          id?: string
+          impressions?: number
+          initiate_checkout?: number
+          inline_link_clicks?: number
+          landing_page_views?: number
+          level?: string
+          placement?: string | null
+          publisher_platform?: string | null
+          purchase_value?: number
+          purchases?: number
+          reach?: number
+          results_leads?: number
+          roas?: number | null
+          spend?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facts_meta_insights_daily_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facts_meta_insights_daily_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       funnel_data: {
         Row: {
           created_at: string
