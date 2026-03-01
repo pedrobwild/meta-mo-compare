@@ -1,4 +1,4 @@
-import { useMemo, useState, Fragment } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useAppState, useFilteredRecords } from '@/lib/store';
 import {
   aggregateMetrics,
@@ -9,8 +9,16 @@ import {
   type GroupedRow,
 } from '@/lib/calculations';
 import { computeVerdict, getHeatmapColor, type VerdictResult } from '@/lib/insights/verdicts';
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronRight, Info } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info, Home } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 
 type SortKey = 'name' | 'verdict' | 'spend_brl' | 'results' | 'cost_per_result' | 'ctr_link' | 'cpc_link' | 'impressions' | 'landing_page_views' | 'cpm' | 'lpv_rate' | 'qualified_ctr' | 'result_per_lpv' | 'frequency';
 
@@ -39,25 +47,66 @@ const columns: ColDef[] = [
 
 const INVERTED_KEYS = new Set(['cpc_link', 'cpm', 'cost_per_result', 'cost_per_lpv', 'frequency']);
 
+interface BreadcrumbLevel {
+  level: 'campaign' | 'adset' | 'ad';
+  key: string;
+  name: string;
+}
+
+const LEVEL_LABELS: Record<string, string> = {
+  campaign: 'Campanhas',
+  adset: 'Conjuntos',
+  ad: 'Anúncios',
+};
+
 export default function HeatmapTable() {
   const { state } = useAppState();
   const { current: currentRecords, previous: previousRecords } = useFilteredRecords();
   const [sortKey, setSortKey] = useState<SortKey>('spend_brl');
   const [sortAsc, setSortAsc] = useState(false);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [drillPath, setDrillPath] = useState<BreadcrumbLevel[]>([]);
 
-  const avgMetrics = useMemo(() => aggregateMetrics(currentRecords), [currentRecords]);
+  const currentLevel = drillPath.length === 0
+    ? state.analysisLevel
+    : drillPath.length === 1
+      ? 'adset'
+      : 'ad';
+
+  const filteredCurrent = useMemo(() => {
+    if (drillPath.length === 0) return currentRecords;
+    let filtered = currentRecords;
+    for (const crumb of drillPath) {
+      if (crumb.level === 'campaign') {
+        filtered = filtered.filter(r => (r.campaign_key || 'sem-campanha') === crumb.key);
+      } else if (crumb.level === 'adset') {
+        filtered = filtered.filter(r => (r.adset_key || 'sem-conjunto') === crumb.key);
+      }
+    }
+    return filtered;
+  }, [currentRecords, drillPath]);
+
+  const filteredPrevious = useMemo(() => {
+    if (drillPath.length === 0) return previousRecords;
+    let filtered = previousRecords;
+    for (const crumb of drillPath) {
+      if (crumb.level === 'campaign') {
+        filtered = filtered.filter(r => (r.campaign_key || 'sem-campanha') === crumb.key);
+      } else if (crumb.level === 'adset') {
+        filtered = filtered.filter(r => (r.adset_key || 'sem-conjunto') === crumb.key);
+      }
+    }
+    return filtered;
+  }, [previousRecords, drillPath]);
+
+  const avgMetrics = useMemo(() => aggregateMetrics(filteredCurrent), [filteredCurrent]);
 
   const rows = useMemo(() => {
-    if (currentRecords.length === 0) return [];
-    return groupByLevel(currentRecords, previousRecords, state.analysisLevel, state.searchQuery, state.includeInactive);
-  }, [currentRecords, previousRecords, state.analysisLevel, state.searchQuery, state.includeInactive]);
+    if (filteredCurrent.length === 0) return [];
+    return groupByLevel(filteredCurrent, filteredPrevious, currentLevel as any, state.searchQuery, state.includeInactive);
+  }, [filteredCurrent, filteredPrevious, currentLevel, state.searchQuery, state.includeInactive]);
 
   const rowsWithVerdicts = useMemo(() => {
-    return rows.map(row => ({
-      row,
-      verdict: computeVerdict(row, avgMetrics),
-    }));
+    return rows.map(row => ({ row, verdict: computeVerdict(row, avgMetrics) }));
   }, [rows, avgMetrics]);
 
   const sorted = useMemo(() => {
@@ -75,95 +124,97 @@ export default function HeatmapTable() {
     else { setSortKey(key); setSortAsc(false); }
   };
 
-  const toggleExpand = (key: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  };
+  const canDrillDown = currentLevel !== 'ad';
 
-  const getChildren = (parentKey: string, parentLevel: 'campaign' | 'adset'): { row: GroupedRow; verdict: VerdictResult }[] => {
-    const childLevel = parentLevel === 'campaign' ? 'adset' : 'ad';
-    const filterByParent = (recs: typeof currentRecords) => {
-      if (parentLevel === 'campaign') return recs.filter(r => (r.campaign_key || 'sem-campanha') === parentKey);
-      return recs.filter(r => (r.adset_key || 'sem-conjunto') === parentKey);
-    };
-    const childRows = groupByLevel(filterByParent(currentRecords), filterByParent(previousRecords), childLevel as any, '', state.includeInactive)
-      .sort((a, b) => b.metrics.spend_brl - a.metrics.spend_brl);
-    return childRows.map(row => ({ row, verdict: computeVerdict(row, avgMetrics) }));
-  };
+  const handleDrill = useCallback((row: GroupedRow) => {
+    if (!canDrillDown) return;
+    setDrillPath(prev => [...prev, { level: currentLevel as 'campaign' | 'adset', key: row.key, name: row.name }]);
+    setSortKey('spend_brl');
+    setSortAsc(false);
+  }, [canDrillDown, currentLevel]);
 
-  const canDrillDown = state.analysisLevel !== 'ad';
+  const handleBreadcrumbClick = useCallback((index: number) => {
+    // index = -1 means root
+    if (index < 0) {
+      setDrillPath([]);
+    } else {
+      setDrillPath(prev => prev.slice(0, index + 1));
+    }
+    setSortKey('spend_brl');
+    setSortAsc(false);
+  }, []);
 
-  if (sorted.length === 0) return null;
+  if (sorted.length === 0 && drillPath.length === 0) return null;
 
   const SortIcon = ({ col }: { col: SortKey }) => {
     if (sortKey !== col) return null;
     return sortAsc ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
   };
 
-  const renderRow = ({ row, verdict }: { row: GroupedRow; verdict: VerdictResult }, depth: number) => {
-    const isExpanded = expanded.has(`${depth}-${row.key}`);
-    const showExpander = canDrillDown && depth < 2;
-    const indent = depth * 20;
-
-    return (
-      <Fragment key={`${depth}-${row.key}`}>
-        <tr
-          className={`border-b border-border/30 hover:bg-secondary/40 transition-colors ${showExpander ? 'cursor-pointer' : ''} ${depth > 0 ? 'bg-secondary/10' : ''}`}
-          onClick={showExpander ? () => toggleExpand(`${depth}-${row.key}`) : undefined}
-        >
-          <td className="p-2.5 max-w-[200px] sticky left-0 bg-card z-10">
-            <div className="flex items-center gap-1" style={{ paddingLeft: `${indent}px` }}>
-              {showExpander && (
-                <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-              )}
-              <p className={`truncate text-xs ${depth === 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
-                {row.name}
-              </p>
-            </div>
-          </td>
-
-          <td className="p-2.5 text-center">
-            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold ${verdict.color}`}>
-              {verdict.emoji} {verdict.score}
-            </span>
-          </td>
-
-          {columns.map(col => {
-            const val = (row.metrics as any)[col.key] ?? 0;
-            const heatColor = getHeatmapColor(val, (avgMetrics as any)[col.key], INVERTED_KEYS.has(col.key));
-            const d = row.delta.deltas[col.key];
-            const hasChange = d && d.percent !== null && Math.abs(d.percent) >= 0.5;
-            const positive = d ? (col.invertDelta ? d.absolute < 0 : d.absolute > 0) : null;
-
-            return (
-              <td key={col.key} className={`p-2.5 text-right whitespace-nowrap ${heatColor}`}>
-                <p className={`text-xs ${depth === 0 ? 'text-foreground' : 'text-muted-foreground'}`}>
-                  {col.format(val)}
-                </p>
-                {hasChange && (
-                  <span className={`text-[10px] ${positive ? 'text-positive' : 'text-negative'}`}>
-                    {d.percent! > 0 ? '+' : ''}{d.percent!.toFixed(1)}%
-                  </span>
-                )}
-              </td>
-            );
-          })}
-        </tr>
-        {isExpanded && (() => {
-          const childLevel = depth === 0 ? (state.analysisLevel === 'campaign' ? 'campaign' : 'adset') : 'adset';
-          const children = getChildren(row.key, childLevel as any);
-          return children.map(child => renderRow(child, depth + 1));
-        })()}
-      </Fragment>
-    );
-  };
+  const nextLevelLabel = currentLevel === 'campaign' ? 'conjuntos' : currentLevel === 'adset' ? 'anúncios' : '';
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className="glass-card overflow-hidden">
+        {/* Breadcrumb Navigation */}
+        <div className="px-3 py-2 border-b border-border/30 bg-secondary/20">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                {drillPath.length > 0 ? (
+                  <BreadcrumbLink
+                    className="cursor-pointer flex items-center gap-1 text-xs hover:text-primary transition-colors"
+                    onClick={() => handleBreadcrumbClick(-1)}
+                  >
+                    <Home className="h-3 w-3" />
+                    {LEVEL_LABELS[state.analysisLevel]}
+                  </BreadcrumbLink>
+                ) : (
+                  <BreadcrumbPage className="flex items-center gap-1 text-xs font-medium">
+                    <Home className="h-3 w-3" />
+                    {LEVEL_LABELS[state.analysisLevel]}
+                  </BreadcrumbPage>
+                )}
+              </BreadcrumbItem>
+
+              {drillPath.map((crumb, i) => {
+                const isLast = i === drillPath.length - 1;
+                return (
+                  <span key={crumb.key} className="contents">
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      {isLast ? (
+                        <BreadcrumbPage className="text-xs font-medium max-w-[200px] truncate">
+                          {crumb.name}
+                        </BreadcrumbPage>
+                      ) : (
+                        <BreadcrumbLink
+                          className="cursor-pointer text-xs hover:text-primary transition-colors max-w-[200px] truncate"
+                          onClick={() => handleBreadcrumbClick(i)}
+                        >
+                          {crumb.name}
+                        </BreadcrumbLink>
+                      )}
+                    </BreadcrumbItem>
+                  </span>
+                );
+              })}
+
+              {drillPath.length > 0 && (
+                <>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                      {LEVEL_LABELS[currentLevel]}
+                    </span>
+                  </BreadcrumbItem>
+                </>
+              )}
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+
+        {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -196,7 +247,62 @@ export default function HeatmapTable() {
               </tr>
             </thead>
             <tbody>
-              {sorted.slice(0, 50).map(item => renderRow(item, 0))}
+              {sorted.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length + 2} className="p-8 text-center text-muted-foreground text-sm">
+                    Nenhum dado encontrado neste nível.
+                    {drillPath.length > 0 && (
+                      <button
+                        className="ml-2 text-primary hover:underline"
+                        onClick={() => handleBreadcrumbClick(drillPath.length - 2)}
+                      >
+                        Voltar
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ) : (
+                sorted.slice(0, 50).map(({ row, verdict }) => (
+                  <tr
+                    key={row.key}
+                    className={`border-b border-border/30 hover:bg-secondary/40 transition-colors ${canDrillDown ? 'cursor-pointer' : ''}`}
+                    onClick={canDrillDown ? () => handleDrill(row) : undefined}
+                  >
+                    <td className="p-2.5 max-w-[200px] sticky left-0 bg-card z-10">
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-xs text-foreground font-medium">{row.name}</p>
+                        {canDrillDown && (
+                          <span className="text-[9px] text-muted-foreground/60 whitespace-nowrap">
+                            → {nextLevelLabel}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-2.5 text-center">
+                      <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold ${verdict.color}`}>
+                        {verdict.emoji} {verdict.score}
+                      </span>
+                    </td>
+                    {columns.map(col => {
+                      const val = (row.metrics as any)[col.key] ?? 0;
+                      const heatColor = getHeatmapColor(val, (avgMetrics as any)[col.key], INVERTED_KEYS.has(col.key));
+                      const d = row.delta.deltas[col.key];
+                      const hasChange = d && d.percent !== null && Math.abs(d.percent) >= 0.5;
+                      const positive = d ? (col.invertDelta ? d.absolute < 0 : d.absolute > 0) : null;
+                      return (
+                        <td key={col.key} className={`p-2.5 text-right whitespace-nowrap ${heatColor}`}>
+                          <p className="text-xs text-foreground">{col.format(val)}</p>
+                          {hasChange && (
+                            <span className={`text-[10px] ${positive ? 'text-positive' : 'text-negative'}`}>
+                              {d.percent! > 0 ? '+' : ''}{d.percent!.toFixed(1)}%
+                            </span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
