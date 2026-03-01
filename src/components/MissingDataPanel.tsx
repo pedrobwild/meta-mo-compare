@@ -43,30 +43,26 @@ const FEATURES: FeatureStatus[] = [
   {
     name: 'ROAS / AOV',
     description: 'Retorno sobre investimento e ticket médio',
-    available: false,
-    reason: 'Falta coluna de revenue/conversion value no export',
-    howToUnlock: 'Adicionar "Valor de conversão" ou usar dados de funil manual',
+    available: true,
+  },
+  {
+    name: 'Heatmaps por Placement/Idade/Geo',
+    description: 'Breakdown por posicionamento, faixa etária e região',
+    available: true,
+    howToUnlock: 'Sincronize com breakdowns ativados para ver dados segmentados',
+  },
+  {
+    name: 'Elasticidade +R$1/dia',
+    description: 'Curva marginal de spend vs resultado por dia',
+    available: true,
+    howToUnlock: 'Dados diários já são sincronizados automaticamente',
   },
   {
     name: 'Hook vs Hold (Vídeo)',
     description: 'Análise de retenção de vídeo (hook rate, hold rate)',
     available: false,
-    reason: 'Falta métricas de vídeo no export',
-    howToUnlock: 'Exportar com colunas: ThruPlay, Video Watches at 25/50/75/95%, Video Average Play Time',
-  },
-  {
-    name: 'Heatmaps por Placement/Idade/Geo',
-    description: 'Breakdown por posicionamento, faixa etária e região',
-    available: false,
-    reason: 'Falta breakdown columns no export',
-    howToUnlock: 'Exportar relatório com breakdown por Posicionamento, Idade ou Região',
-  },
-  {
-    name: 'Elasticidade +R$1/dia',
-    description: 'Curva marginal de spend vs resultado por dia',
-    available: false,
-    reason: 'Necessita dados diários (daily) com spend/results por dia',
-    howToUnlock: 'Importar exports diários (granularity=day) com pelo menos 14 dias de dados',
+    reason: 'API ainda não busca métricas de vídeo (ThruPlay, Video Watches)',
+    howToUnlock: 'Em breve: adicionar campos de vídeo à sincronização com o Meta',
   },
 ];
 
