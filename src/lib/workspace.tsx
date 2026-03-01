@@ -36,8 +36,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           const { data } = await supabase.from('workspaces').select('*');
           const ws = (data || []) as Workspace[];
           setWorkspaces(ws);
-          if (ws.length > 0 && !workspace) {
-            setWorkspace(ws[0]);
+          if (ws.length > 0) {
+            setWorkspace(prev => prev || ws[0]);
           }
           setLoading(false);
         }, 0);

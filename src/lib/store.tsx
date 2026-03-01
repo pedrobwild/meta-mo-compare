@@ -152,6 +152,8 @@ function usePersistingDispatch(dispatch: React.Dispatch<Action>) {
         saveRecords(action.records);
         break;
       case 'IMPORT_FILE':
+        // Save the full merged records, not just the new ones
+        // The reducer upserts newRecords into state.records, so we need to persist the result
         saveRecords(action.newRecords);
         break;
       case 'SET_TARGETS':
