@@ -36,6 +36,7 @@ function makeRow(key: string, name: string, metricsOverrides: Partial<Aggregated
     previousMetrics: null,
     delta: makeDelta(metrics, null),
     records: [],
+    status: 'active' as const,
   };
 }
 

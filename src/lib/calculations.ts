@@ -106,6 +106,7 @@ export interface GroupedRow {
   previousMetrics: AggregatedMetrics | null;
   delta: DeltaMetrics;
   records: MetaRecord[];
+  status: 'active' | 'inactive';
 }
 
 export function groupByLevel(
@@ -157,7 +158,14 @@ export function groupByLevel(
     const previousMetrics = prevRecs.length > 0 ? aggregateMetrics(prevRecs) : null;
     const delta = computeDeltas(metrics, previousMetrics);
 
-    rows.push({ key, name, metrics, previousMetrics, delta, records: recs });
+    // Derive status: active if any record has non-inactive delivery_status or has spend
+    const hasActiveRecord = recs.some(r => {
+      const ds = (r.delivery_status || '').toLowerCase();
+      return ds === '' || ds === 'active' || ds === 'ativo' || ds === 'in_progress' || ds === 'em veiculação';
+    });
+    const status: 'active' | 'inactive' = (hasActiveRecord || metrics.spend_brl > 0) ? 'active' : 'inactive';
+
+    rows.push({ key, name, metrics, previousMetrics, delta, records: recs, status });
   }
 
   return rows.sort((a, b) => b.metrics.spend_brl - a.metrics.spend_brl);
