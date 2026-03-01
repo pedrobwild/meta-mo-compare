@@ -2,15 +2,35 @@ import { supabase } from '@/integrations/supabase/client';
 import type { MetaRecord, PeriodTargets, FunnelData, LeadQualityRecord, SourceType, PeriodGranularity } from './types';
 
 export async function loadRecords(): Promise<MetaRecord[]> {
-  const { data, error } = await supabase
-    .from('meta_records')
-    .select('*')
-    .order('period_start', { ascending: false });
+  // Paginate to avoid Supabase 1000-row default limit
+  const allData: any[] = [];
+  const PAGE_SIZE = 1000;
+  let from = 0;
+  let hasMore = true;
 
-  if (error) {
-    console.error('Error loading records:', error);
-    return [];
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from('meta_records')
+      .select('*')
+      .order('period_start', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) {
+      console.error('Error loading records:', error);
+      break;
+    }
+
+    if (data && data.length > 0) {
+      allData.push(...data);
+      from += PAGE_SIZE;
+      hasMore = data.length === PAGE_SIZE;
+    } else {
+      hasMore = false;
+    }
   }
+
+  const data = allData;
+  if (data.length === 0) return [];
 
   return (data || []).map((r: any) => ({
     unique_key: r.unique_key,

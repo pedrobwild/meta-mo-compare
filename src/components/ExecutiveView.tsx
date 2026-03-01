@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useAppState, useFilteredRecords } from '@/lib/store';
 import {
   aggregateMetrics,
@@ -31,18 +31,20 @@ import {
 
 function safe(n: number, d: number) { return d > 0 ? n / d : 0; }
 
+let sparklineCounter = 0;
 function Sparkline({ data, dataKey, color }: { data: any[]; dataKey: string; color: string }) {
+  const [gradId] = useState(() => `grad-${dataKey}-${++sparklineCounter}`);
   return (
     <div className="h-12 w-28">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
           <defs>
-            <linearGradient id={`grad-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={color} stopOpacity={0.4} />
               <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={1.5} fill={`url(#grad-${dataKey})`} dot={false} />
+          <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={1.5} fill={`url(#${gradId})`} dot={false} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
