@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef, useMemo, type ReactNode } from 'react';
-import type { AppState, MetaRecord, ImportLog, PeriodTargets, FunnelData, TruthSource, AnalysisLevel, HierarchyMaps, PeriodGranularity } from './types';
+import type { AppState, MetaRecord, ImportLog, PeriodTargets, FunnelData, LeadQualityRecord, TruthSource, AnalysisLevel, HierarchyMaps, PeriodGranularity } from './types';
 import { getDateBounds, computeComparisonRange, filterByDateRange, aggregateMetrics, computeDeltas, detectDefaultGranularity } from './calculations';
 import { buildHierarchyMaps, enrichRecords, upsertRecords } from './parser';
 import { loadRecords, saveRecords, loadTargets, saveTarget, loadFunnelData, saveFunnel, clearAllData } from './persistence';
@@ -9,6 +9,7 @@ const initialState: AppState = {
   importLogs: [],
   targets: [],
   funnelData: [],
+  leadQuality: [],
   hierarchyMaps: { ad_to_adset: {}, ad_to_campaign: {}, adset_to_campaign: {} },
   truthSource: 'type3_full',
   dateFrom: null,
@@ -37,8 +38,9 @@ type Action =
   | { type: 'SET_INCLUDE_INACTIVE'; value: boolean }
   | { type: 'SET_TARGETS'; targets: PeriodTargets }
   | { type: 'SET_FUNNEL'; funnel: FunnelData }
+  | { type: 'SET_LEAD_QUALITY'; data: LeadQualityRecord[] }
   | { type: 'CLEAR_ALL' }
-  | { type: 'HYDRATE'; records: MetaRecord[]; targets: PeriodTargets[]; funnelData: FunnelData[] };
+  | { type: 'HYDRATE'; records: MetaRecord[]; targets: PeriodTargets[]; funnelData: FunnelData[]; leadQuality?: LeadQualityRecord[] };
 
 function autoSelectDateRange(records: MetaRecord[]) {
   const bounds = getDateBounds(records);
@@ -68,6 +70,7 @@ function reducer(state: AppState, action: Action): AppState {
         records,
         targets: action.targets,
         funnelData: action.funnelData,
+        leadQuality: action.leadQuality || state.leadQuality,
         hierarchyMaps: maps,
         selectedGranularity: granularity,
         ...dates,
@@ -131,6 +134,8 @@ function reducer(state: AppState, action: Action): AppState {
       const existing = state.funnelData.filter(f => f.period_key !== action.funnel.period_key);
       return { ...state, funnelData: [...existing, action.funnel] };
     }
+    case 'SET_LEAD_QUALITY':
+      return { ...state, leadQuality: action.data };
     case 'CLEAR_ALL':
       return initialState;
     default:
