@@ -32,6 +32,7 @@ import ActionCenter from '@/components/ActionCenter';
 import AlertsView from '@/components/AlertsView';
 import AIChatPanel from '@/components/AIChatPanel';
 import AIRecommendationsPanel from '@/components/AIRecommendationsPanel';
+import FunnelRealView from '@/components/FunnelRealView';
 import Auth from '@/pages/Auth';
 
 function EmptyState() {
@@ -169,6 +170,9 @@ function DashboardContent() {
 
               {activeTab === 'funnel' && (
                 <ViewContainer key="funnel"><FunnelView /></ViewContainer>
+              )}
+              {activeTab === 'funnel-real' && (
+                <ViewContainer key="funnel-real"><FunnelRealView /></ViewContainer>
               )}
               {activeTab === 'simulator' && hasData && (
                 <ViewContainer key="simulator"><BudgetSimulator /></ViewContainer>

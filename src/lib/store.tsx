@@ -2,7 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, useRef, useMem
 import type { AppState, MetaRecord, ImportLog, PeriodTargets, FunnelData, LeadQualityRecord, TruthSource, AnalysisLevel, HierarchyMaps, PeriodGranularity } from './types';
 import { getDateBounds, computeComparisonRange, filterByDateRange, aggregateMetrics, computeDeltas, detectDefaultGranularity } from './calculations';
 import { buildHierarchyMaps, enrichRecords, upsertRecords } from './parser';
-import { loadRecords, saveRecords, loadTargets, saveTarget, loadFunnelData, saveFunnel, clearAllData } from './persistence';
+import { loadRecords, saveRecords, loadTargets, saveTarget, loadFunnelData, saveFunnel, loadLeadQuality, clearAllData } from './persistence';
 
 const initialState: AppState = {
   records: [],
@@ -181,10 +181,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (hydrated.current) return;
     hydrated.current = true;
 
-    Promise.all([loadRecords(), loadTargets(), loadFunnelData()]).then(
-      ([records, targets, funnelData]) => {
-        if (records.length > 0 || targets.length > 0 || funnelData.length > 0) {
-          rawDispatch({ type: 'HYDRATE', records, targets, funnelData });
+    Promise.all([loadRecords(), loadTargets(), loadFunnelData(), loadLeadQuality()]).then(
+      ([records, targets, funnelData, leadQuality]) => {
+        if (records.length > 0 || targets.length > 0 || funnelData.length > 0 || leadQuality.length > 0) {
+          rawDispatch({ type: 'HYDRATE', records, targets, funnelData, leadQuality });
         }
       }
     );
