@@ -163,7 +163,7 @@ export default function HeatmapTable() {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="glass-card overflow-hidden">
+      <div className="glass-card overflow-hidden" data-ranking-table>
         {/* Breadcrumb Navigation */}
         <div className="px-3 py-2 border-b border-border/30 bg-secondary/20">
           <Breadcrumb>
