@@ -14,6 +14,88 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_accounts: {
+        Row: {
+          created_at: string
+          currency: string | null
+          external_account_id: string
+          id: string
+          name: string | null
+          provider: string
+          timezone: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string | null
+          external_account_id: string
+          id?: string
+          name?: string | null
+          provider?: string
+          timezone?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string | null
+          external_account_id?: string
+          id?: string
+          name?: string | null
+          provider?: string
+          timezone?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_accounts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      connectors: {
+        Row: {
+          config_json: Json | null
+          created_at: string
+          id: string
+          last_successful_sync: string | null
+          provider: string
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          config_json?: Json | null
+          created_at?: string
+          id?: string
+          last_successful_sync?: string | null
+          provider?: string
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          config_json?: Json | null
+          created_at?: string
+          id?: string
+          last_successful_sync?: string | null
+          provider?: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connectors_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       decisions_log: {
         Row: {
           action_type: string
@@ -262,6 +344,63 @@ export type Database = {
           vendas?: number | null
         }
         Relationships: []
+      }
+      sync_runs: {
+        Row: {
+          ad_account_id: string | null
+          error: string | null
+          finished_at: string | null
+          id: string
+          params_json: Json | null
+          provider: string
+          records_fetched: number | null
+          records_upserted: number | null
+          started_at: string
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          ad_account_id?: string | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          params_json?: Json | null
+          provider?: string
+          records_fetched?: number | null
+          records_upserted?: number | null
+          started_at?: string
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          ad_account_id?: string | null
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          params_json?: Json | null
+          provider?: string
+          records_fetched?: number | null
+          records_upserted?: number | null
+          started_at?: string
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_runs_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       workspace_memberships: {
         Row: {
