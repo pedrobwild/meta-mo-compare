@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, FlaskConical } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { parseFile } from '@/lib/parser';
 import { useAppState } from '@/lib/store';
 import { toast } from 'sonner';
@@ -87,35 +87,8 @@ export default function FileUpload() {
         </div>
       )}
 
-      <div className="mt-4 border-t border-border pt-4 flex flex-wrap items-center justify-center gap-3">
+      <div className="mt-4 border-t border-border pt-4 flex items-center justify-center">
         <ImportTemplateModal />
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          onClick={async (e) => {
-            e.stopPropagation();
-            try {
-              setProcessing(true);
-              const urls = ['/test-w02.csv', '/test-w03.csv', '/test-w04.csv', '/test-w05.csv', '/test-w06.csv', '/test-w07.csv', '/test-w08.csv', '/test-w09.csv'];
-              for (const url of urls) {
-                const res = await fetch(url);
-                if (!res.ok) { toast.error(`Não encontrou ${url}`); continue; }
-                const blob = await res.blob();
-                const file = new File([blob], url.split('/').pop()!, { type: 'text/csv' });
-                await handleFile(file);
-              }
-              toast.success('Dados de teste carregados!');
-            } catch (err: any) {
-              toast.error(err.message);
-            } finally {
-              setProcessing(false);
-            }
-          }}
-        >
-          <FlaskConical className="h-4 w-4" />
-          Carregar 8 semanas de teste
-        </Button>
       </div>
     </div>
   );
