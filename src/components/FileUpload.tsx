@@ -5,6 +5,7 @@ import { useAppState } from '@/lib/store';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { getPeriodLabel } from '@/lib/calculations';
+import ImportTemplateModal from './ImportTemplateModal';
 
 export default function FileUpload() {
   const { state, dispatch } = useAppState();
@@ -86,7 +87,8 @@ export default function FileUpload() {
         </div>
       )}
 
-      <div className="mt-4 border-t border-border pt-4">
+      <div className="mt-4 border-t border-border pt-4 flex flex-wrap items-center justify-center gap-3">
+        <ImportTemplateModal />
         <Button
           variant="outline"
           size="sm"

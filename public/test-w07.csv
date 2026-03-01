@@ -1,5 +1,5 @@
 Nome do anúncio,Nome da campanha,Nome do conjunto de anúncios,Status de veiculação,Nível de veiculação,Tipo de resultado,Resultados,Alcance,Frequência,Custo por resultado,Valor usado (BRL),Impressões,CPM (custo por 1.000 impressões),Cliques no link,CPC (custo por clique no link),CTR (taxa de cliques no link),Cliques (todos),CTR (todos),CPC (todos),Visualizações da página de destino,Custo por visualização da página de destino,Início dos relatórios,Término dos relatórios
-"Ad Criativo A","Campanha Leads","Conjunto Público Frio","Ativa","Anúncio","Leads",12,6000,"2,1","22,92","275,00",12600,"21,83",138,"1,99","1,10",172,"1,37","1,60",108,"2,55",10/02/2026,16/02/2026
-"Ad Criativo B","Campanha Leads","Conjunto Público Quente","Ativa","Anúncio","Leads",16,8200,"2,3","17,19","275,00",18860,"14,58",200,"1,38","1,06",240,"1,27","1,15",170,"1,62",10/02/2026,16/02/2026
-"Ad Vídeo C","Campanha Tráfego","Conjunto Remarketing","Ativa","Anúncio","Cliques no link",0,3400,"1,7","0,00","155,00",5780,"26,82",85,"1,82","1,47",108,"1,87","1,44",60,"2,58",10/02/2026,16/02/2026
-"Ad Carrossel D","Campanha Leads","Conjunto Lookalike","Ativa","Anúncio","Leads",6,3700,"1,5","28,33","170,00",5550,"30,63",68,"2,50","1,23",88,"1,59","1,93",52,"3,27",10/02/2026,16/02/2026
+Ad Criativo A,Campanha Leads,Conjunto Público Frio,Ativa,Anúncio,Leads,12,6000,2.1,22.92,275.00,12600,21.83,138,1.99,1.10,172,1.37,1.60,108,2.55,10/02/2026,16/02/2026
+Ad Criativo B,Campanha Leads,Conjunto Público Quente,Ativa,Anúncio,Leads,16,8200,2.3,17.19,275.00,18860,14.58,200,1.38,1.06,240,1.27,1.15,170,1.62,10/02/2026,16/02/2026
+Ad Vídeo C,Campanha Tráfego,Conjunto Remarketing,Ativa,Anúncio,Cliques no link,0,3400,1.7,0,155.00,5780,26.82,85,1.82,1.47,108,1.87,1.44,60,2.58,10/02/2026,16/02/2026
+Ad Carrossel D,Campanha Leads,Conjunto Lookalike,Ativa,Anúncio,Leads,6,3700,1.5,28.33,170.00,5550,30.63,68,2.50,1.23,88,1.59,1.93,52,3.27,10/02/2026,16/02/2026
