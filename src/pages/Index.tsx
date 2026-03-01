@@ -146,7 +146,7 @@ function DashboardContent() {
         )}
 
         {/* No data states */}
-        {(activeTab === 'executive' || activeTab === 'tactical' || activeTab === 'diagnostic') && !hasData && (
+        {(activeTab === 'executive' || activeTab === 'tactical' || activeTab === 'diagnostic' || activeTab === 'simulator') && !hasData && (
           <div className="text-center py-20 space-y-4">
             <BarChart3 className="h-16 w-16 text-muted-foreground/30 mx-auto" />
             <p className="text-muted-foreground">Importe relatórios do Meta Ads para começar</p>
