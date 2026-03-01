@@ -245,68 +245,74 @@ export default function AdComparisonSelector() {
             </div>
           </div>
 
-          {/* KPI Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {KPI_DEFS.map(kpi => {
+          {/* KPI Table */}
+          <div className="border border-border/40 rounded-lg overflow-hidden">
+            {/* Table header */}
+            <div className="grid grid-cols-[1fr_minmax(90px,120px)_60px_minmax(90px,120px)] gap-0 bg-surface-2/60 border-b border-border/40 px-4 py-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Métrica</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-primary text-right truncate" title={rowA.name}>
+                {rowA.name.length > 20 ? rowA.name.slice(0, 20) + '…' : rowA.name}
+              </div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground text-center">Δ</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-accent text-right truncate" title={rowB.name}>
+                {rowB.name.length > 20 ? rowB.name.slice(0, 20) + '…' : rowB.name}
+              </div>
+            </div>
+            {/* Table rows */}
+            {KPI_DEFS.map((kpi, idx) => {
               const va = rowA.metrics[kpi.key];
               const vb = rowB.metrics[kpi.key];
               const equal = va === vb || (va === 0 && vb === 0);
               const aWins = !equal && (kpi.lowerIsBetter ? va < vb : va > vb);
               const bWins = !equal && !aWins;
 
-              // Calculate % difference (A relative to B)
               const diffPct = vb !== 0 ? ((va - vb) / Math.abs(vb)) * 100 : va !== 0 ? 100 : 0;
               const absDiff = Math.abs(diffPct);
-              // For "lower is better" metrics, negative diff means A is better
               const diffIsGood = kpi.lowerIsBetter ? diffPct < 0 : diffPct > 0;
 
               return (
-                <div key={kpi.key as string} className="border border-border/40 rounded-lg p-3 bg-surface-1/30">
-                  <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
+                <div
+                  key={kpi.key as string}
+                  className={`grid grid-cols-[1fr_minmax(90px,120px)_60px_minmax(90px,120px)] gap-0 px-4 py-2.5 items-center ${
+                    idx % 2 === 0 ? 'bg-surface-1/20' : 'bg-transparent'
+                  } ${idx < KPI_DEFS.length - 1 ? 'border-b border-border/20' : ''}`}
+                >
+                  {/* Metric label */}
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {kpi.label}
                   </div>
-                  <div className="flex items-end justify-between gap-2">
-                    {/* Value A */}
-                    <div className="flex-1">
-                      <div className={`text-sm font-bold font-mono ${
-                        aWins ? 'text-primary' : bWins ? 'text-muted-foreground' : 'text-foreground'
-                      }`}>
-                        {kpi.format(va)}
-                      </div>
-                      {aWins && (
-                        <div className="flex items-center gap-0.5 mt-0.5">
-                          <Trophy className="h-3 w-3 text-warning" />
-                          <span className="text-[9px] font-semibold text-warning">CAMPEÃ</span>
-                        </div>
-                      )}
-                    </div>
 
-                    {/* Divider + diff */}
-                    <div className="flex flex-col items-center pb-1 flex-shrink-0">
-                      <div className="text-[10px] text-muted-foreground/40 font-mono">vs</div>
-                      {!equal && absDiff > 0.1 && (
-                        <div className={`text-[9px] font-mono font-semibold mt-0.5 ${
-                          diffIsGood ? 'text-positive' : 'text-negative'
-                        }`}>
-                          {diffPct > 0 ? '+' : ''}{diffPct.toFixed(1)}%
-                        </div>
-                      )}
-                    </div>
+                  {/* Value A */}
+                  <div className="text-right flex items-center justify-end gap-1.5">
+                    <span className={`text-sm font-bold font-mono ${
+                      aWins ? 'text-primary' : bWins ? 'text-muted-foreground' : 'text-foreground'
+                    }`}>
+                      {kpi.format(va)}
+                    </span>
+                    {aWins && <Trophy className="h-3 w-3 text-warning flex-shrink-0" />}
+                  </div>
 
-                    {/* Value B */}
-                    <div className="flex-1 text-right">
-                      <div className={`text-sm font-bold font-mono ${
-                        bWins ? 'text-accent' : aWins ? 'text-muted-foreground' : 'text-foreground'
+                  {/* Delta */}
+                  <div className="text-center">
+                    {!equal && absDiff > 0.1 ? (
+                      <span className={`text-[10px] font-mono font-semibold ${
+                        diffIsGood ? 'text-positive' : 'text-negative'
                       }`}>
-                        {kpi.format(vb)}
-                      </div>
-                      {bWins && (
-                        <div className="flex items-center gap-0.5 mt-0.5 justify-end">
-                          <Trophy className="h-3 w-3 text-warning" />
-                          <span className="text-[9px] font-semibold text-warning">CAMPEÃ</span>
-                        </div>
-                      )}
-                    </div>
+                        {diffPct > 0 ? '+' : ''}{diffPct.toFixed(1)}%
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground/30">—</span>
+                    )}
+                  </div>
+
+                  {/* Value B */}
+                  <div className="text-right flex items-center justify-end gap-1.5">
+                    <span className={`text-sm font-bold font-mono ${
+                      bWins ? 'text-accent' : aWins ? 'text-muted-foreground' : 'text-foreground'
+                    }`}>
+                      {kpi.format(vb)}
+                    </span>
+                    {bWins && <Trophy className="h-3 w-3 text-warning flex-shrink-0" />}
                   </div>
                 </div>
               );
