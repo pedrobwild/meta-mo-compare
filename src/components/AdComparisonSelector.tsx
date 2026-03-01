@@ -49,9 +49,50 @@ export default function AdComparisonSelector() {
       .filter(r => r.metrics.spend_brl > 0 && r.metrics.impressions > 100);
   }, [current, previous, state.analysisLevel]);
 
+  // Detect dominant result_type per row
+  const rowResultType = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const row of rows) {
+      const types: Record<string, number> = {};
+      for (const rec of row.records) {
+        const t = rec.result_type || 'Sem tipo';
+        types[t] = (types[t] || 0) + rec.spend_brl;
+      }
+      // Pick the result_type with the most spend
+      let best = 'Sem tipo';
+      let bestVal = 0;
+      for (const [t, v] of Object.entries(types)) {
+        if (v > bestVal) { best = t; bestVal = v; }
+      }
+      map[row.key] = best;
+    }
+    return map;
+  }, [rows]);
+
+  // Group rows by result_type for the selector
+  const rowsByType = useMemo(() => {
+    const groups: Record<string, typeof rows> = {};
+    for (const row of rows) {
+      const t = rowResultType[row.key] || 'Sem tipo';
+      if (!groups[t]) groups[t] = [];
+      groups[t].push(row);
+    }
+    return groups;
+  }, [rows, rowResultType]);
+
+  // Determine the active result_type based on the first selected item
+  const activeResultType = selectedKeys.length > 0
+    ? rowResultType[selectedKeys[0]] || null
+    : null;
+
   const toggleKey = (key: string) => {
     setSelectedKeys(prev => {
       if (prev.includes(key)) return prev.filter(k => k !== key);
+      // If selecting a new item with different result_type, reset selection
+      const newType = rowResultType[key];
+      if (prev.length > 0 && rowResultType[prev[0]] !== newType) {
+        return [key]; // reset to new type
+      }
       if (prev.length >= 2) return [prev[1], key]; // rotate: keep last, add new
       return [...prev, key];
     });
@@ -102,30 +143,50 @@ export default function AdComparisonSelector() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0" align="end">
-              <ScrollArea className="max-h-64">
+              <ScrollArea className="max-h-72">
                 <div className="p-1">
-                  {rows.map(row => {
-                    const isSelected = selectedKeys.includes(row.key);
+                  {Object.entries(rowsByType).map(([type, typeRows]) => {
+                    const isDisabledGroup = activeResultType !== null && type !== activeResultType;
                     return (
-                      <button
-                        key={row.key}
-                        onClick={() => toggleKey(row.key)}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs rounded-md transition-colors ${
-                          isSelected ? 'bg-primary/10 text-primary' : 'hover:bg-muted/50 text-foreground'
-                        }`}
-                      >
-                        <div className={`h-4 w-4 rounded border flex items-center justify-center flex-shrink-0 ${
-                          isSelected ? 'bg-primary border-primary' : 'border-border'
-                        }`}>
-                          {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                      <div key={type}>
+                        <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/30 flex items-center justify-between">
+                          <span>{type}</span>
+                          <span className="font-mono">{typeRows.length}</span>
                         </div>
-                        <span className="truncate flex-1">{row.name}</span>
-                        <span className="text-muted-foreground font-mono text-[10px]">R${row.metrics.spend_brl.toFixed(0)}</span>
-                      </button>
+                        {typeRows.map(row => {
+                          const isSelected = selectedKeys.includes(row.key);
+                          const isDisabled = isDisabledGroup && !isSelected;
+                          return (
+                            <button
+                              key={row.key}
+                              onClick={() => !isDisabled && toggleKey(row.key)}
+                              disabled={isDisabled}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs rounded-md transition-colors ${
+                                isSelected ? 'bg-primary/10 text-primary' : 
+                                isDisabled ? 'opacity-40 cursor-not-allowed text-muted-foreground' :
+                                'hover:bg-muted/50 text-foreground'
+                              }`}
+                            >
+                              <div className={`h-4 w-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                                isSelected ? 'bg-primary border-primary' : 'border-border'
+                              }`}>
+                                {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                              </div>
+                              <span className="truncate flex-1">{row.name}</span>
+                              <span className="text-muted-foreground font-mono text-[10px]">R${row.metrics.spend_brl.toFixed(0)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     );
                   })}
                 </div>
               </ScrollArea>
+              {activeResultType && (
+                <div className="px-3 py-2 border-t border-border/30 text-[10px] text-muted-foreground">
+                  Comparando apenas: <span className="font-semibold text-foreground">{activeResultType}</span>
+                </div>
+              )}
             </PopoverContent>
           </Popover>
         </div>
