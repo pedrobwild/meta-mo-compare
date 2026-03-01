@@ -20,4 +20,15 @@ export const THRESHOLDS = {
   // General
   min_spend_for_insight: 50, // R$ minimum to consider
   min_impressions: 1000,
+
+  // I9–I16: Lead quality & creative thresholds
+  taxa_atendimento_low: 0.40,
+  roas_real_scale: 3.0,
+  roas_real_warning: 1.5,
+  ctr_high_for_matrix: 0.035,
+  lpv_rate_high_for_matrix: 0.75,
+  creative_degradation_alert: 0.25,
+  creative_degradation_pause: 0.50,
+  learning_phase_results: 50,
+  learning_phase_min_spend: 150,
 };
