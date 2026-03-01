@@ -16,13 +16,14 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
-  BarChart,
-  Bar,
+  ScatterChart,
+  Scatter,
   XAxis,
   YAxis,
   Tooltip,
   Cell,
   ReferenceLine,
+  ZAxis,
 } from 'recharts';
 
 // ── Helpers ──────────────────────────────────────────
@@ -152,7 +153,8 @@ function DecisionMatrix2x2({
     const ctr = row.metrics.ctr_link || 0;
     const lq = leadQualityByCampaign[row.key];
     const yVal = hasLeadData && lq ? lq.taxa_atendimento : (row.metrics.lpv_rate || safe(row.metrics.landing_page_views, row.metrics.link_clicks));
-    return { name: row.name, key: row.key, ctr, yVal };
+    const spend = row.metrics.spend_brl || 0;
+    return { name: row.name, key: row.key, ctr, yVal, yPct: yVal * 100, spend };
   });
 
   const quadrants = {
@@ -160,6 +162,28 @@ function DecisionMatrix2x2({
     topRight: { label: '🟢 Escalar', desc: 'Criativo atrai, público tem intenção. Aumente budget 20-30%/semana monitorando frequência.', class: 'bg-positive/8 border-positive/20' },
     botLeft:  { label: '🔴 Pausar', desc: 'Problema duplo: criativo fraco e público errado. Pausar e repensar antes de reinvestir.', class: 'bg-destructive/8 border-destructive/20' },
     botRight: { label: '🔵 Revisar Público', desc: 'Criativo performa bem, mas público não tem intenção real. Adicione qualificadores na segmentação.', class: 'bg-primary/8 border-primary/20' },
+  };
+
+  const getPointColor = (p: typeof points[0]) => {
+    if (p.ctr >= ctrThreshold && p.yVal >= yThreshold) return 'hsl(var(--positive))';
+    if (p.ctr < ctrThreshold && p.yVal >= yThreshold) return 'hsl(var(--warning))';
+    if (p.ctr >= ctrThreshold && p.yVal < yThreshold) return 'hsl(var(--primary))';
+    return 'hsl(var(--destructive))';
+  };
+
+  const maxSpend = Math.max(...points.map(p => p.spend), 1);
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (!active || !payload?.length) return null;
+    const d = payload[0].payload;
+    return (
+      <div className="glass-panel p-2 text-[10px] space-y-0.5 max-w-[200px]">
+        <p className="font-semibold text-foreground truncate">{d.name}</p>
+        <p className="text-muted-foreground">CTR: {d.ctr.toFixed(2)}%</p>
+        <p className="text-muted-foreground">{yLabel}: {d.yPct.toFixed(0)}%</p>
+        <p className="text-muted-foreground">Spend: R${d.spend.toFixed(0)}</p>
+      </div>
+    );
   };
 
   return (
@@ -175,69 +199,113 @@ function DecisionMatrix2x2({
         )}
       </div>
 
-      {/* Header row */}
+      {/* Scatter Plot */}
+      {points.length > 0 && (
+        <div className="h-52 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <ScatterChart margin={{ top: 10, right: 15, bottom: 20, left: 5 }}>
+              <XAxis
+                type="number"
+                dataKey="ctr"
+                name="CTR"
+                unit="%"
+                tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
+                axisLine={{ stroke: 'hsl(var(--border))' }}
+                tickLine={false}
+                label={{ value: 'CTR Link %', position: 'insideBottom', offset: -10, fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
+              />
+              <YAxis
+                type="number"
+                dataKey="yPct"
+                name={yLabel}
+                unit="%"
+                tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
+                axisLine={{ stroke: 'hsl(var(--border))' }}
+                tickLine={false}
+                label={{ value: yLabel + ' %', angle: -90, position: 'insideLeft', offset: 10, fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
+              />
+              <ZAxis type="number" dataKey="spend" range={[40, 200]} />
+              <Tooltip content={<CustomTooltip />} />
+              <ReferenceLine
+                x={ctrThreshold}
+                stroke="hsl(var(--border))"
+                strokeDasharray="4 4"
+                strokeWidth={1.5}
+              />
+              <ReferenceLine
+                y={yThreshold * 100}
+                stroke="hsl(var(--border))"
+                strokeDasharray="4 4"
+                strokeWidth={1.5}
+              />
+              <Scatter data={points} isAnimationActive={false}>
+                {points.map((p, i) => (
+                  <Cell key={i} fill={getPointColor(p)} fillOpacity={0.85} stroke={getPointColor(p)} strokeWidth={1} />
+                ))}
+              </Scatter>
+            </ScatterChart>
+          </ResponsiveContainer>
+          <p className="text-[9px] text-muted-foreground text-center -mt-1">Tamanho do ponto = investimento relativo</p>
+        </div>
+      )}
+
+      {/* Quadrant Grid */}
       <div className="grid grid-cols-[100px_1fr_1fr] gap-px text-[10px] font-bold text-muted-foreground">
         <div />
         <div className="text-center p-1">CTR baixo (&lt;{ctrThreshold}%)</div>
         <div className="text-center p-1">CTR alto (≥{ctrThreshold}%)</div>
       </div>
 
-      {/* Top row: High Y */}
       <div className="grid grid-cols-[100px_1fr_1fr] gap-px">
         <div className="flex items-center text-[10px] font-bold text-muted-foreground pr-2 text-right leading-tight">
           {yLabel} alto (≥{(yThreshold * 100).toFixed(0)}%)
         </div>
-        {/* Top-Left: Low CTR + High Y → Revisar Criativo */}
         <div className={`p-3 rounded-tl-lg space-y-1 ${quadrants.topLeft.class}`}>
           <p className="text-[10px] font-bold text-foreground">{quadrants.topLeft.label}</p>
           <p className="text-[9px] text-muted-foreground leading-snug">{quadrants.topLeft.desc}</p>
           <div className="space-y-0.5 mt-1">
             {points.filter(p => p.ctr < ctrThreshold && p.yVal >= yThreshold).map(p => (
               <p key={p.key} className="text-[10px] font-mono text-foreground truncate" title={p.name}>
-                • {p.name.slice(0, 22)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {(p.yVal * 100).toFixed(0)}%)</span>
+                • {p.name.slice(0, 22)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {p.yPct.toFixed(0)}%)</span>
               </p>
             ))}
           </div>
         </div>
-        {/* Top-Right: High CTR + High Y → Escalar */}
         <div className={`p-3 rounded-tr-lg space-y-1 ${quadrants.topRight.class}`}>
           <p className="text-[10px] font-bold text-foreground">{quadrants.topRight.label}</p>
           <p className="text-[9px] text-muted-foreground leading-snug">{quadrants.topRight.desc}</p>
           <div className="space-y-0.5 mt-1">
             {points.filter(p => p.ctr >= ctrThreshold && p.yVal >= yThreshold).map(p => (
               <p key={p.key} className="text-[10px] font-mono text-foreground truncate" title={p.name}>
-                • {p.name.slice(0, 22)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {(p.yVal * 100).toFixed(0)}%)</span>
+                • {p.name.slice(0, 22)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {p.yPct.toFixed(0)}%)</span>
               </p>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Bottom row: Low Y */}
       <div className="grid grid-cols-[100px_1fr_1fr] gap-px">
         <div className="flex items-center text-[10px] font-bold text-muted-foreground pr-2 text-right leading-tight">
           {yLabel} baixo (&lt;{(yThreshold * 100).toFixed(0)}%)
         </div>
-        {/* Bottom-Left: Low CTR + Low Y → Pausar */}
         <div className={`p-3 rounded-bl-lg space-y-1 ${quadrants.botLeft.class}`}>
           <p className="text-[10px] font-bold text-foreground">{quadrants.botLeft.label}</p>
           <p className="text-[9px] text-muted-foreground leading-snug">{quadrants.botLeft.desc}</p>
           <div className="space-y-0.5 mt-1">
             {points.filter(p => p.ctr < ctrThreshold && p.yVal < yThreshold).map(p => (
               <p key={p.key} className="text-[10px] font-mono text-foreground truncate" title={p.name}>
-                • {p.name.slice(0, 22)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {(p.yVal * 100).toFixed(0)}%)</span>
+                • {p.name.slice(0, 22)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {p.yPct.toFixed(0)}%)</span>
               </p>
             ))}
           </div>
         </div>
-        {/* Bottom-Right: High CTR + Low Y → Revisar Público */}
         <div className={`p-3 rounded-br-lg space-y-1 ${quadrants.botRight.class}`}>
           <p className="text-[10px] font-bold text-foreground">{quadrants.botRight.label}</p>
           <p className="text-[9px] text-muted-foreground leading-snug">{quadrants.botRight.desc}</p>
           <div className="space-y-0.5 mt-1">
             {points.filter(p => p.ctr >= ctrThreshold && p.yVal < yThreshold).map(p => (
               <p key={p.key} className="text-[10px] font-mono text-foreground truncate" title={p.name}>
-                • {p.name.slice(0, 22)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {(p.yVal * 100).toFixed(0)}%)</span>
+                • {p.name.slice(0, 22)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {p.yPct.toFixed(0)}%)</span>
               </p>
             ))}
           </div>
