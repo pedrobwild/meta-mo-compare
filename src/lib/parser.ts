@@ -83,21 +83,10 @@ function detectGranularity(start: string, end: string): PeriodGranularity {
   return start === end ? 'day' : 'week';
 }
 
-// Generate ISO week key from a date string
-function getISOWeekKey(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  // ISO week: Monday is first day
-  const dayOfWeek = d.getDay() || 7; // Sunday=7
-  d.setDate(d.getDate() + 4 - dayOfWeek); // Thursday of this week
-  const yearStart = new Date(d.getFullYear(), 0, 1);
-  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return `${d.getFullYear()}-W${String(weekNo).padStart(2, '0')}`;
-}
-
-// Generate period_key based on granularity
-function generatePeriodKey(start: string, granularity: PeriodGranularity): string {
+// Generate period_key based on actual date range
+function generatePeriodKey(start: string, end: string, granularity: PeriodGranularity): string {
   if (granularity === 'day') return start; // "YYYY-MM-DD"
-  return getISOWeekKey(start); // "YYYY-Www"
+  return `${start}_${end}`; // "YYYY-MM-DD_YYYY-MM-DD"
 }
 
 function mapRow(row: Record<string, any>, sourceType: SourceType): MetaRecord | null {
@@ -124,7 +113,7 @@ function mapRow(row: Record<string, any>, sourceType: SourceType): MetaRecord | 
     ? detectGranularity(period_start, period_end)
     : 'week';
   const period_key = period_start !== 'unknown'
-    ? generatePeriodKey(period_start, granularity)
+    ? generatePeriodKey(period_start, period_end, granularity)
     : 'unknown';
 
   // Legacy month_key derived from period_start

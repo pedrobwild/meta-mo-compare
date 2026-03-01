@@ -198,14 +198,24 @@ export function getPreviousPeriod(periodKey: string, granularity: PeriodGranular
     d.setDate(d.getDate() - 1);
     return d.toISOString().slice(0, 10);
   }
-  // Week: "YYYY-Www" -> previous week
+  // Date range format: "YYYY-MM-DD_YYYY-MM-DD"
+  const rangeParts = periodKey.split('_');
+  if (rangeParts.length === 2) {
+    const start = new Date(rangeParts[0] + 'T00:00:00');
+    const end = new Date(rangeParts[1] + 'T00:00:00');
+    const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+    const prevEnd = new Date(start);
+    prevEnd.setDate(prevEnd.getDate() - 1);
+    const prevStart = new Date(prevEnd);
+    prevStart.setDate(prevStart.getDate() - days + 1);
+    return `${prevStart.toISOString().slice(0, 10)}_${prevEnd.toISOString().slice(0, 10)}`;
+  }
+  // Legacy week format
   const match = periodKey.match(/^(\d{4})-W(\d{2})$/);
   if (match) {
     const year = parseInt(match[1]);
     const week = parseInt(match[2]);
-    if (week <= 1) {
-      return `${year - 1}-W52`;
-    }
+    if (week <= 1) return `${year - 1}-W52`;
     return `${year}-W${String(week - 1).padStart(2, '0')}`;
   }
   return periodKey;
@@ -240,7 +250,16 @@ export function getPeriodLabel(periodKey: string, granularity: PeriodGranularity
     const d = new Date(periodKey + 'T00:00:00');
     return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
   }
-  // Week: "YYYY-Www"
+  // Date range format: "YYYY-MM-DD_YYYY-MM-DD"
+  const rangeParts = periodKey.split('_');
+  if (rangeParts.length === 2) {
+    const formatDate = (iso: string) => {
+      const d = new Date(iso + 'T00:00:00');
+      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    };
+    return `${formatDate(rangeParts[0])} - ${formatDate(rangeParts[1])}`;
+  }
+  // Legacy week format "YYYY-Www"
   const match = periodKey.match(/^(\d{4})-W(\d{2})$/);
   if (match) {
     return `Sem ${match[2]}/${match[1]}`;
