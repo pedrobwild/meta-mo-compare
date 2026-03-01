@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Cloud, BarChart3, Zap } from 'lucide-react';
+import { Cloud, BarChart3, Zap, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppProvider, useAppState } from '@/lib/store';
 import { useWorkspace } from '@/lib/workspace';
@@ -30,6 +30,8 @@ import MetaSyncButton from '@/components/MetaSyncButton';
 import OnboardingTour from '@/components/OnboardingTour';
 import ActionCenter from '@/components/ActionCenter';
 import AlertsView from '@/components/AlertsView';
+import AIChatPanel from '@/components/AIChatPanel';
+import AIRecommendationsPanel from '@/components/AIRecommendationsPanel';
 import Auth from '@/pages/Auth';
 
 function EmptyState() {
@@ -86,6 +88,7 @@ function DashboardContent() {
   const { state, dispatch } = useAppState();
   const { user, loading: wsLoading } = useWorkspace();
   const [activeTab, setActiveTab] = useState<Tab>('executive');
+  const [chatOpen, setChatOpen] = useState(false);
   const hasData = state.records.length > 0;
   const { filter: crossFilter, clearFilter } = useCrossFilter();
 
@@ -188,9 +191,24 @@ function DashboardContent() {
               {activeTab === 'actions' && (
                 <ViewContainer key="actions"><ActionCenter /></ViewContainer>
               )}
+              {activeTab === 'ai' && (
+                <ViewContainer key="ai"><AIRecommendationsPanel /></ViewContainer>
+              )}
             </AnimatePresence>
           </main>
         </div>
+
+        {/* Floating AI Chat Button */}
+        {!chatOpen && (
+          <button
+            onClick={() => setChatOpen(true)}
+            className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+          >
+            <Bot className="h-5 w-5" />
+          </button>
+        )}
+
+        <AIChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
       </div>
       <OnboardingTour />
     </SidebarProvider>
