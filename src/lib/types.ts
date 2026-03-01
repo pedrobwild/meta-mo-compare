@@ -203,6 +203,7 @@ export interface AppState {
   importLogs: ImportLog[];
   targets: PeriodTargets[];
   funnelData: FunnelData[];
+  leadQuality: LeadQualityRecord[];
   hierarchyMaps: HierarchyMaps;
   truthSource: TruthSource;
   // Date range selection (primary)
