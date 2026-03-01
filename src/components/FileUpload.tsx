@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { getPeriodLabel } from '@/lib/calculations';
 import ImportTemplateModal from './ImportTemplateModal';
+import MetaSyncButton from './MetaSyncButton';
 
 export default function FileUpload() {
   const { state, dispatch } = useAppState();
@@ -87,8 +88,16 @@ export default function FileUpload() {
         </div>
       )}
 
-      <div className="mt-4 border-t border-border pt-4 flex items-center justify-center">
-        <ImportTemplateModal />
+      <div className="mt-4 border-t border-border pt-4 space-y-4">
+        <MetaSyncButton />
+        <div className="flex items-center gap-3 justify-center">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs text-muted-foreground">ou importe manualmente</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+        <div className="flex justify-center">
+          <ImportTemplateModal />
+        </div>
       </div>
     </div>
   );
