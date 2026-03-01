@@ -84,6 +84,71 @@ export interface PeriodTargets {
 // Legacy alias for migration
 export type MonthlyTargets = PeriodTargets;
 
+// ── Lead Quality (funil real de negócio) ──────────────────────────────────
+
+export interface LeadQualityRecord {
+  id: string;
+  workspace_id: string;
+  date: string;
+  campaign_key: string;
+  adset_key?: string | null;
+  ad_key?: string | null;
+  leads_total: number;
+  leads_atendidos: number;
+  leads_qualificados: number;
+  visitas_agendadas: number;
+  propostas_enviadas: number;
+  contratos_fechados: number;
+  receita_brl: number;
+  notes?: string | null;
+}
+
+export interface LeadQualityMetrics {
+  campaign_key: string;
+  leads_total: number;
+  taxa_atendimento: number;       // leads_atendidos / leads_total
+  taxa_qualificacao: number;      // leads_qualificados / leads_total
+  taxa_agendamento: number;       // visitas_agendadas / leads_total
+  taxa_fechamento: number;        // contratos_fechados / leads_total
+  cpa_reuniao: number;            // spend_brl / visitas_agendadas
+  cpa_contrato: number;           // spend_brl / contratos_fechados
+  roas_real: number;              // receita_brl / spend_brl
+  receita_por_lead: number;       // receita_brl / leads_total
+  receita_brl: number;
+  contratos_fechados: number;
+}
+
+// ── Creative Lifecycle ────────────────────────────────────────────────────
+
+export type CreativeStatus = 'fresh' | 'peaking' | 'declining' | 'fatigued';
+
+export interface CreativeLifecycleRecord {
+  id: string;
+  workspace_id: string;
+  ad_key: string;
+  ad_name: string;
+  campaign_key?: string | null;
+  adset_key?: string | null;
+  format?: string | null;
+  hook_type?: string | null;
+  activated_at?: string | null;
+  days_active: number;
+  peak_ctr: number;
+  peak_ctr_date?: string | null;
+  current_ctr: number;
+  degradation_pct: number;
+  status: string;
+}
+
+// Vida útil média por formato (em dias) — atualizada com dados históricos
+export const CREATIVE_LIFESPAN: Record<string, number> = {
+  video: 14,
+  image: 21,
+  carousel: 28,
+  stories: 10,
+  default: 18,
+};
+
 export interface FunnelData {
   period_key: PeriodKey;
   granularity: PeriodGranularity;
