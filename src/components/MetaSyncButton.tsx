@@ -5,9 +5,11 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAppState } from '@/lib/store';
 import { loadRecords } from '@/lib/persistence';
+import { useWorkspace } from '@/lib/workspace';
 
 export default function MetaSyncButton() {
   const { dispatch } = useAppState();
+  const { workspace } = useWorkspace();
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
@@ -15,7 +17,7 @@ export default function MetaSyncButton() {
     setSyncing(true);
     try {
       const { data, error } = await supabase.functions.invoke('sync-meta-ads', {
-        body: { date_preset: datePreset },
+        body: { date_preset: datePreset, workspace_id: workspace?.id },
       });
 
       if (error) throw new Error(error.message);
