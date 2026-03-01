@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarIcon, ArrowRightLeft } from 'lucide-react';
+import { CalendarIcon, ArrowRightLeft, Search, Filter, Layers } from 'lucide-react';
 import { useAppState } from '@/lib/store';
 import { getDateBounds, getDateRangeLabel } from '@/lib/calculations';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -16,9 +16,9 @@ import type { TruthSource, AnalysisLevel } from '@/lib/types';
 import type { DateRange } from 'react-day-picker';
 
 const PRESETS = [
-  { label: '7 dias', days: 7 },
-  { label: '14 dias', days: 14 },
-  { label: '30 dias', days: 30 },
+  { label: '7d', days: 7 },
+  { label: '14d', days: 14 },
+  { label: '30d', days: 30 },
 ] as const;
 
 export default function GlobalFilters() {
@@ -41,8 +41,6 @@ export default function GlobalFilters() {
       const to = format(range.to, 'yyyy-MM-dd');
       dispatch({ type: 'SET_DATE_RANGE', from, to });
       setMainOpen(false);
-    } else if (range?.from) {
-      // Single day selected, wait for second click
     }
   };
 
@@ -69,141 +67,132 @@ export default function GlobalFilters() {
 
   const mainLabel = state.dateFrom && state.dateTo
     ? getDateRangeLabel(state.dateFrom, state.dateTo)
-    : 'Selecionar período';
+    : 'Período';
 
   const compLabel = state.comparisonFrom && state.comparisonTo
     ? getDateRangeLabel(state.comparisonFrom, state.comparisonTo)
-    : 'Nenhum';
+    : 'Comparar';
 
   return (
-    <div className="flex flex-wrap items-end gap-3 glass-card p-4">
-      {/* Date Range Picker */}
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Período</Label>
-        <Popover open={mainOpen} onOpenChange={setMainOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                'w-[220px] justify-start text-left font-normal bg-secondary border-border',
-                !state.dateFrom && 'text-muted-foreground'
-              )}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {mainLabel}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <div className="flex flex-wrap gap-1 p-3 pb-0 border-b border-border">
-              {PRESETS.map(p => (
-                <Button
-                  key={p.days}
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs h-7"
-                  onClick={() => { applyPreset(p.days); setMainOpen(false); }}
-                >
-                  {p.label}
-                </Button>
-              ))}
-              <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => { applyMonthPreset(0); setMainOpen(false); }}>
-                Este mês
-              </Button>
-              <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => { applyMonthPreset(-1); setMainOpen(false); }}>
-                Mês passado
-              </Button>
-            </div>
-            <Calendar
-              mode="range"
-              selected={{ from: mainFrom, to: mainTo }}
-              onSelect={handleMainSelect}
-              numberOfMonths={2}
-              className={cn('p-3 pointer-events-auto')}
-              locale={ptBR}
-            />
-          </PopoverContent>
-        </Popover>
+    <div className="flex items-center gap-2 flex-wrap">
+      {/* Quick presets */}
+      <div className="flex items-center gap-0.5">
+        {PRESETS.map(p => (
+          <Button
+            key={p.days}
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-secondary"
+            onClick={() => applyPreset(p.days)}
+          >
+            {p.label}
+          </Button>
+        ))}
       </div>
+
+      <div className="h-4 w-px bg-border" />
+
+      {/* Date Range Picker */}
+      <Popover open={mainOpen} onOpenChange={setMainOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              'h-7 gap-1.5 text-[11px] font-mono bg-surface-2/50 border-border hover:border-primary/30 hover:bg-surface-2',
+              !state.dateFrom && 'text-muted-foreground'
+            )}
+          >
+            <CalendarIcon className="h-3 w-3" />
+            {mainLabel}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <div className="flex flex-wrap gap-1 p-2 pb-0 border-b border-border">
+            {PRESETS.map(p => (
+              <Button key={p.days} variant="ghost" size="sm" className="text-[10px] h-6 px-2" onClick={() => { applyPreset(p.days); setMainOpen(false); }}>
+                {p.label}
+              </Button>
+            ))}
+            <Button variant="ghost" size="sm" className="text-[10px] h-6 px-2" onClick={() => { applyMonthPreset(0); setMainOpen(false); }}>
+              Mês atual
+            </Button>
+            <Button variant="ghost" size="sm" className="text-[10px] h-6 px-2" onClick={() => { applyMonthPreset(-1); setMainOpen(false); }}>
+              Mês anterior
+            </Button>
+          </div>
+          <Calendar
+            mode="range"
+            selected={{ from: mainFrom, to: mainTo }}
+            onSelect={handleMainSelect}
+            numberOfMonths={2}
+            className={cn('p-3 pointer-events-auto')}
+            locale={ptBR}
+          />
+        </PopoverContent>
+      </Popover>
 
       {/* Comparison Range */}
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground flex items-center gap-1">
-          <ArrowRightLeft className="h-3 w-3" /> Comparar com
-        </Label>
-        <Popover open={compOpen} onOpenChange={setCompOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                'w-[220px] justify-start text-left font-normal bg-secondary border-border',
-                !state.comparisonFrom && 'text-muted-foreground'
-              )}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {compLabel}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="range"
-              selected={{ from: compFrom, to: compTo }}
-              onSelect={handleCompSelect}
-              numberOfMonths={2}
-              className={cn('p-3 pointer-events-auto')}
-              locale={ptBR}
-            />
-          </PopoverContent>
-        </Popover>
-      </div>
+      <Popover open={compOpen} onOpenChange={setCompOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              'h-7 gap-1.5 text-[11px] font-mono bg-surface-2/50 border-border hover:border-primary/30',
+              !state.comparisonFrom && 'text-muted-foreground'
+            )}
+          >
+            <ArrowRightLeft className="h-3 w-3" />
+            {compLabel}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="range"
+            selected={{ from: compFrom, to: compTo }}
+            onSelect={handleCompSelect}
+            numberOfMonths={2}
+            className={cn('p-3 pointer-events-auto')}
+            locale={ptBR}
+          />
+        </PopoverContent>
+      </Popover>
+
+      <div className="h-4 w-px bg-border" />
 
       {/* Analysis Level */}
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Nível</Label>
-        <Select value={state.analysisLevel} onValueChange={l => dispatch({ type: 'SET_ANALYSIS_LEVEL', level: l as AnalysisLevel })}>
-          <SelectTrigger className="w-[130px] bg-secondary border-border">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="campaign">Campanha</SelectItem>
-            <SelectItem value="adset">Conjunto</SelectItem>
-            <SelectItem value="ad">Anúncio</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Truth Source */}
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Fonte</Label>
-        <Select value={state.truthSource} onValueChange={s => dispatch({ type: 'SET_TRUTH_SOURCE', source: s as TruthSource })}>
-          <SelectTrigger className="w-[140px] bg-secondary border-border">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="type3_full">Full Hierarchy</SelectItem>
-            <SelectItem value="type2_ad_campaign">Ad + Campanha</SelectItem>
-            <SelectItem value="type1_ad_only">Ad Only</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <Select value={state.analysisLevel} onValueChange={l => dispatch({ type: 'SET_ANALYSIS_LEVEL', level: l as AnalysisLevel })}>
+        <SelectTrigger className="h-7 w-auto gap-1 text-[11px] bg-surface-2/50 border-border px-2 [&>svg]:h-3 [&>svg]:w-3">
+          <Layers className="h-3 w-3 text-muted-foreground mr-1" />
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="campaign">Campanha</SelectItem>
+          <SelectItem value="adset">Conjunto</SelectItem>
+          <SelectItem value="ad">Anúncio</SelectItem>
+        </SelectContent>
+      </Select>
 
       {/* Search */}
-      <div className="space-y-1.5 flex-1 min-w-[180px]">
-        <Label className="text-xs text-muted-foreground">Buscar</Label>
+      <div className="relative">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
         <Input
-          placeholder="Filtrar por nome..."
+          placeholder="Buscar..."
           value={state.searchQuery}
           onChange={e => dispatch({ type: 'SET_SEARCH_QUERY', query: e.target.value })}
-          className="bg-secondary border-border"
+          className="h-7 w-36 pl-7 text-[11px] bg-surface-2/50 border-border focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
         />
       </div>
 
       {/* Inactive toggle */}
-      <div className="flex items-center gap-2 pb-1">
+      <div className="flex items-center gap-1.5">
         <Switch
           checked={state.includeInactive}
           onCheckedChange={v => dispatch({ type: 'SET_INCLUDE_INACTIVE', value: v })}
+          className="scale-75"
         />
-        <Label className="text-xs text-muted-foreground">Inativos</Label>
+        <Label className="text-[10px] text-muted-foreground">Inativos</Label>
       </div>
     </div>
   );
