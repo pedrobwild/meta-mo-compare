@@ -95,7 +95,7 @@ export default function FileUpload() {
             e.stopPropagation();
             try {
               setProcessing(true);
-              const urls = ['/test-jan.csv', '/test-fev.csv'];
+              const urls = ['/test-w02.csv', '/test-w03.csv', '/test-w04.csv', '/test-w05.csv', '/test-w06.csv', '/test-w07.csv', '/test-w08.csv', '/test-w09.csv'];
               for (const url of urls) {
                 const res = await fetch(url);
                 if (!res.ok) { toast.error(`Não encontrou ${url}`); continue; }
@@ -112,7 +112,7 @@ export default function FileUpload() {
           }}
         >
           <FlaskConical className="h-4 w-4" />
-          Carregar dados de teste
+          Carregar 8 semanas de teste
         </Button>
       </div>
     </div>
