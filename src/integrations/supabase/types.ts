@@ -17,9 +17,11 @@ export type Database = {
       funnel_data: {
         Row: {
           created_at: string
+          granularity: string
           id: string
           month_key: string
           mql: number
+          period_key: string | null
           receita: number
           sql_count: number
           updated_at: string
@@ -27,9 +29,11 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          granularity?: string
           id?: string
           month_key: string
           mql?: number
+          period_key?: string | null
           receita?: number
           sql_count?: number
           updated_at?: string
@@ -37,9 +41,11 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          granularity?: string
           id?: string
           month_key?: string
           mql?: number
+          period_key?: string | null
           receita?: number
           sql_count?: number
           updated_at?: string
@@ -67,11 +73,15 @@ export type Database = {
           delivery_level: string | null
           delivery_status: string | null
           frequency: number
+          granularity: string
           id: string
           impressions: number
           landing_page_views: number
           link_clicks: number
           month_key: string
+          period_end: string | null
+          period_key: string | null
+          period_start: string | null
           reach: number
           report_end: string | null
           report_start: string | null
@@ -100,11 +110,15 @@ export type Database = {
           delivery_level?: string | null
           delivery_status?: string | null
           frequency?: number
+          granularity?: string
           id?: string
           impressions?: number
           landing_page_views?: number
           link_clicks?: number
           month_key: string
+          period_end?: string | null
+          period_key?: string | null
+          period_start?: string | null
           reach?: number
           report_end?: string | null
           report_start?: string | null
@@ -133,11 +147,15 @@ export type Database = {
           delivery_level?: string | null
           delivery_status?: string | null
           frequency?: number
+          granularity?: string
           id?: string
           impressions?: number
           landing_page_views?: number
           link_clicks?: number
           month_key?: string
+          period_end?: string | null
+          period_key?: string | null
+          period_start?: string | null
           reach?: number
           report_end?: string | null
           report_start?: string | null
@@ -157,10 +175,12 @@ export type Database = {
           cpm: number | null
           created_at: string
           ctr_link: number | null
+          granularity: string
           id: string
           lpv: number | null
           month_key: string
           mql: number | null
+          period_key: string | null
           receita: number | null
           results: number | null
           roas: number | null
@@ -176,10 +196,12 @@ export type Database = {
           cpm?: number | null
           created_at?: string
           ctr_link?: number | null
+          granularity?: string
           id?: string
           lpv?: number | null
           month_key: string
           mql?: number | null
+          period_key?: string | null
           receita?: number | null
           results?: number | null
           roas?: number | null
@@ -195,10 +217,12 @@ export type Database = {
           cpm?: number | null
           created_at?: string
           ctr_link?: number | null
+          granularity?: string
           id?: string
           lpv?: number | null
           month_key?: string
           mql?: number | null
+          period_key?: string | null
           receita?: number | null
           results?: number | null
           roas?: number | null
