@@ -5,7 +5,7 @@ export async function loadRecords(): Promise<MetaRecord[]> {
   const { data, error } = await supabase
     .from('meta_records')
     .select('*')
-    .order('month_key', { ascending: false });
+    .order('period_start', { ascending: false });
 
   if (error) {
     console.error('Error loading records:', error);
