@@ -1,8 +1,7 @@
 import { useMemo, useState, Fragment } from 'react';
-import { useAppState } from '@/lib/store';
+import { useAppState, useFilteredRecords } from '@/lib/store';
 import {
   aggregateMetrics,
-  filterByPeriodWithFallback,
   groupByLevel,
   formatCurrency,
   formatNumber,
@@ -42,26 +41,17 @@ const INVERTED_KEYS = new Set(['cpc_link', 'cpm', 'cost_per_result', 'cost_per_l
 
 export default function HeatmapTable() {
   const { state } = useAppState();
+  const { current: currentRecords, previous: previousRecords } = useFilteredRecords();
   const [sortKey, setSortKey] = useState<SortKey>('spend_brl');
   const [sortAsc, setSortAsc] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const currentRecords = useMemo(() => {
-    if (!state.selectedPeriodKey) return [];
-    return filterByPeriodWithFallback(state.records, state.selectedPeriodKey, state.truthSource);
-  }, [state.records, state.selectedPeriodKey, state.truthSource]);
-
-  const previousRecords = useMemo(() => {
-    if (!state.comparisonPeriodKey) return [];
-    return filterByPeriodWithFallback(state.records, state.comparisonPeriodKey, state.truthSource);
-  }, [state.records, state.comparisonPeriodKey, state.truthSource]);
-
   const avgMetrics = useMemo(() => aggregateMetrics(currentRecords), [currentRecords]);
 
   const rows = useMemo(() => {
-    if (!state.selectedPeriodKey) return [];
+    if (currentRecords.length === 0) return [];
     return groupByLevel(currentRecords, previousRecords, state.analysisLevel, state.searchQuery, state.includeInactive);
-  }, [currentRecords, previousRecords, state.analysisLevel, state.searchQuery, state.includeInactive, state.selectedPeriodKey]);
+  }, [currentRecords, previousRecords, state.analysisLevel, state.searchQuery, state.includeInactive]);
 
   const rowsWithVerdicts = useMemo(() => {
     return rows.map(row => ({
@@ -124,7 +114,6 @@ export default function HeatmapTable() {
           className={`border-b border-border/30 hover:bg-secondary/40 transition-colors ${showExpander ? 'cursor-pointer' : ''} ${depth > 0 ? 'bg-secondary/10' : ''}`}
           onClick={showExpander ? () => toggleExpand(`${depth}-${row.key}`) : undefined}
         >
-          {/* Name + Verdict */}
           <td className="p-2.5 max-w-[200px] sticky left-0 bg-card z-10">
             <div className="flex items-center gap-1" style={{ paddingLeft: `${indent}px` }}>
               {showExpander && (
@@ -136,14 +125,12 @@ export default function HeatmapTable() {
             </div>
           </td>
 
-          {/* Verdict */}
           <td className="p-2.5 text-center">
             <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold ${verdict.color}`}>
               {verdict.emoji} {verdict.score}
             </span>
           </td>
 
-          {/* Metric cells with heatmap */}
           {columns.map(col => {
             const val = (row.metrics as any)[col.key] ?? 0;
             const heatColor = getHeatmapColor(val, (avgMetrics as any)[col.key], INVERTED_KEYS.has(col.key));

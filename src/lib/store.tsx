@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useReducer, useEffect, useRef, type ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import type { AppState, MetaRecord, ImportLog, PeriodTargets, FunnelData, TruthSource, AnalysisLevel, HierarchyMaps, PeriodGranularity } from './types';
-import { getAvailablePeriods, getPreviousPeriod, detectDefaultGranularity } from './calculations';
-import { upsertRecords, buildHierarchyMaps, enrichRecords } from './parser';
+import { getDateBounds, computeComparisonRange, filterByDateRange, aggregateMetrics, computeDeltas, detectDefaultGranularity } from './calculations';
+import { buildHierarchyMaps, enrichRecords, upsertRecords } from './parser';
 import { loadRecords, saveRecords, loadTargets, saveTarget, loadFunnelData, saveFunnel, clearAllData } from './persistence';
 
 const initialState: AppState = {
@@ -11,7 +11,11 @@ const initialState: AppState = {
   funnelData: [],
   hierarchyMaps: { ad_to_adset: {}, ad_to_campaign: {}, adset_to_campaign: {} },
   truthSource: 'type3_full',
-  selectedGranularity: 'week',
+  dateFrom: null,
+  dateTo: null,
+  comparisonFrom: null,
+  comparisonTo: null,
+  selectedGranularity: 'day',
   selectedPeriodKey: null,
   comparisonPeriodKey: null,
   analysisLevel: 'campaign',
@@ -24,6 +28,8 @@ type Action =
   | { type: 'IMPORT_FILE'; newRecords: MetaRecord[]; log: ImportLog }
   | { type: 'SET_TRUTH_SOURCE'; source: TruthSource }
   | { type: 'SET_GRANULARITY'; granularity: PeriodGranularity }
+  | { type: 'SET_DATE_RANGE'; from: string; to: string }
+  | { type: 'SET_COMPARISON_RANGE'; from: string | null; to: string | null }
   | { type: 'SET_SELECTED_PERIOD'; periodKey: string }
   | { type: 'SET_COMPARISON_PERIOD'; periodKey: string }
   | { type: 'SET_ANALYSIS_LEVEL'; level: AnalysisLevel }
@@ -34,17 +40,20 @@ type Action =
   | { type: 'CLEAR_ALL' }
   | { type: 'HYDRATE'; records: MetaRecord[]; targets: PeriodTargets[]; funnelData: FunnelData[] };
 
-function autoSelectPeriod(records: MetaRecord[], granularity: PeriodGranularity, currentPeriodKey: string | null) {
-  const periods = getAvailablePeriods(records, granularity);
-  const selectedPeriodKey = currentPeriodKey && periods.includes(currentPeriodKey)
-    ? currentPeriodKey
-    : periods[0] || null;
-  const comparisonPeriodKey = selectedPeriodKey
-    ? (periods.includes(getPreviousPeriod(selectedPeriodKey, granularity))
-      ? getPreviousPeriod(selectedPeriodKey, granularity)
-      : periods[1] || null)
-    : null;
-  return { selectedPeriodKey, comparisonPeriodKey };
+function autoSelectDateRange(records: MetaRecord[]) {
+  const bounds = getDateBounds(records);
+  if (!bounds) return { dateFrom: null, dateTo: null, comparisonFrom: null, comparisonTo: null };
+
+  const today = new Date().toISOString().slice(0, 10);
+  const dateTo = bounds.max <= today ? bounds.max : today;
+
+  // Default: last 7 days of data
+  const from = new Date(dateTo + 'T00:00:00');
+  from.setDate(from.getDate() - 6);
+  const dateFrom = from.toISOString().slice(0, 10) < bounds.min ? bounds.min : from.toISOString().slice(0, 10);
+
+  const comp = computeComparisonRange(dateFrom, dateTo);
+  return { dateFrom, dateTo, comparisonFrom: comp.from, comparisonTo: comp.to };
 }
 
 function reducer(state: AppState, action: Action): AppState {
@@ -53,7 +62,7 @@ function reducer(state: AppState, action: Action): AppState {
       const records = action.records;
       const maps = buildHierarchyMaps(records);
       const granularity = detectDefaultGranularity(records);
-      const { selectedPeriodKey, comparisonPeriodKey } = autoSelectPeriod(records, granularity, null);
+      const dates = autoSelectDateRange(records);
       return {
         ...state,
         records,
@@ -61,53 +70,51 @@ function reducer(state: AppState, action: Action): AppState {
         funnelData: action.funnelData,
         hierarchyMaps: maps,
         selectedGranularity: granularity,
-        selectedPeriodKey,
-        comparisonPeriodKey,
+        ...dates,
       };
     }
     case 'SET_RECORDS': {
       const records = action.records;
-      const { selectedPeriodKey, comparisonPeriodKey } = autoSelectPeriod(records, state.selectedGranularity, state.selectedPeriodKey);
+      const dates = autoSelectDateRange(records);
       return {
         ...state,
         records,
         importLogs: [...state.importLogs, action.log],
         hierarchyMaps: action.maps,
-        selectedPeriodKey,
-        comparisonPeriodKey,
+        ...dates,
       };
     }
     case 'IMPORT_FILE': {
       const maps = buildHierarchyMaps([...state.records, ...action.newRecords]);
       const enriched = enrichRecords(action.newRecords, maps);
       const records = upsertRecords(state.records, enriched);
-      const granularity = detectDefaultGranularity(records);
-      const { selectedPeriodKey, comparisonPeriodKey } = autoSelectPeriod(records, granularity, state.selectedPeriodKey);
+      const dates = autoSelectDateRange(records);
       return {
         ...state,
         records,
         importLogs: [...state.importLogs, action.log],
         hierarchyMaps: maps,
-        selectedGranularity: granularity,
-        selectedPeriodKey,
-        comparisonPeriodKey,
+        ...dates,
       };
     }
     case 'SET_TRUTH_SOURCE':
       return { ...state, truthSource: action.source };
-    case 'SET_GRANULARITY': {
-      const { selectedPeriodKey, comparisonPeriodKey } = autoSelectPeriod(state.records, action.granularity, null);
-      return { ...state, selectedGranularity: action.granularity, selectedPeriodKey, comparisonPeriodKey };
-    }
-    case 'SET_SELECTED_PERIOD': {
-      const comp = getPreviousPeriod(action.periodKey, state.selectedGranularity);
-      const periods = getAvailablePeriods(state.records, state.selectedGranularity);
+    case 'SET_GRANULARITY':
+      return { ...state, selectedGranularity: action.granularity };
+    case 'SET_DATE_RANGE': {
+      const comp = computeComparisonRange(action.from, action.to);
       return {
         ...state,
-        selectedPeriodKey: action.periodKey,
-        comparisonPeriodKey: periods.includes(comp) ? comp : periods.find(p => p !== action.periodKey) || null,
+        dateFrom: action.from,
+        dateTo: action.to,
+        comparisonFrom: comp.from,
+        comparisonTo: comp.to,
       };
     }
+    case 'SET_COMPARISON_RANGE':
+      return { ...state, comparisonFrom: action.from, comparisonTo: action.to };
+    case 'SET_SELECTED_PERIOD':
+      return { ...state, selectedPeriodKey: action.periodKey };
     case 'SET_COMPARISON_PERIOD':
       return { ...state, comparisonPeriodKey: action.periodKey };
     case 'SET_ANALYSIS_LEVEL':
@@ -185,4 +192,18 @@ export function useAppState() {
   const ctx = useContext(AppContext);
   if (!ctx) throw new Error('useAppState must be used within AppProvider');
   return ctx;
+}
+
+/** Hook that returns current & previous records filtered by date range */
+export function useFilteredRecords() {
+  const { state } = useAppState();
+  return useMemo(() => {
+    const current = state.dateFrom && state.dateTo
+      ? filterByDateRange(state.records, state.dateFrom, state.dateTo, state.truthSource)
+      : [];
+    const previous = state.comparisonFrom && state.comparisonTo
+      ? filterByDateRange(state.records, state.comparisonFrom, state.comparisonTo, state.truthSource)
+      : [];
+    return { current, previous };
+  }, [state.records, state.dateFrom, state.dateTo, state.comparisonFrom, state.comparisonTo, state.truthSource]);
 }

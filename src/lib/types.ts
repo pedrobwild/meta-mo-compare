@@ -140,7 +140,12 @@ export interface AppState {
   funnelData: FunnelData[];
   hierarchyMaps: HierarchyMaps;
   truthSource: TruthSource;
-  // Period selection (NEW)
+  // Date range selection (primary)
+  dateFrom: string | null;     // "YYYY-MM-DD"
+  dateTo: string | null;       // "YYYY-MM-DD"
+  comparisonFrom: string | null;
+  comparisonTo: string | null;
+  // Legacy period selection (derived, kept for targets/funnel compat)
   selectedGranularity: PeriodGranularity;
   selectedPeriodKey: string | null;
   comparisonPeriodKey: string | null;

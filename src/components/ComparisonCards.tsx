@@ -1,21 +1,18 @@
 import { useMemo } from 'react';
-import { useAppState } from '@/lib/store';
-import { filterByPeriodWithFallback, groupByLevel } from '@/lib/calculations';
+import { useAppState, useFilteredRecords } from '@/lib/store';
+import { groupByLevel } from '@/lib/calculations';
 import { generateComparisons, type AdComparison } from '@/lib/insights/comparisons';
 import { ArrowRight, Trophy, Minus } from 'lucide-react';
 
 export default function ComparisonCards() {
   const { state } = useAppState();
+  const { current, previous } = useFilteredRecords();
 
   const comparisons = useMemo(() => {
-    if (!state.selectedPeriodKey) return [];
-    const current = filterByPeriodWithFallback(state.records, state.selectedPeriodKey, state.truthSource);
-    const previous = state.comparisonPeriodKey
-      ? filterByPeriodWithFallback(state.records, state.comparisonPeriodKey, state.truthSource)
-      : [];
+    if (current.length === 0) return [];
     const rows = groupByLevel(current, previous, state.analysisLevel, '', false);
     return generateComparisons(rows);
-  }, [state.records, state.selectedPeriodKey, state.comparisonPeriodKey, state.truthSource, state.analysisLevel]);
+  }, [current, previous, state.analysisLevel]);
 
   if (comparisons.length === 0) return null;
 
@@ -37,13 +34,11 @@ export default function ComparisonCards() {
 function ComparisonCard({ comparison: c }: { comparison: AdComparison }) {
   return (
     <div className="border border-border rounded-lg p-4 space-y-3">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-semibold text-foreground">{c.title}</h4>
         <span className="text-[10px] text-muted-foreground">{c.description}</span>
       </div>
 
-      {/* Names */}
       <div className="flex items-center gap-2 text-xs">
         <span className={`font-medium ${c.winner === 'A' ? 'text-positive' : 'text-foreground'} truncate max-w-[40%]`}>
           {c.winner === 'A' && '👑 '}{c.adA.name}
@@ -54,7 +49,6 @@ function ComparisonCard({ comparison: c }: { comparison: AdComparison }) {
         </span>
       </div>
 
-      {/* Metrics comparison */}
       <div className="space-y-1.5">
         {c.metrics.map(m => (
           <div key={m.label} className="flex items-center gap-2 text-[11px]">
@@ -70,7 +64,6 @@ function ComparisonCard({ comparison: c }: { comparison: AdComparison }) {
         ))}
       </div>
 
-      {/* Recommendation */}
       <div className="bg-primary/10 rounded-md px-3 py-2">
         <p className="text-[11px] text-primary flex items-start gap-1.5">
           <ArrowRight className="h-3 w-3 mt-0.5 flex-shrink-0" />

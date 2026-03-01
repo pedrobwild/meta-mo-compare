@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
-import { useAppState } from '@/lib/store';
+import { useAppState, useFilteredRecords } from '@/lib/store';
 import {
   aggregateMetrics,
   computeDeltas,
-  filterByPeriodWithFallback,
+  filterByDateRange,
   groupByLevel,
-  getAvailablePeriods,
-  getPeriodLabel,
+  getDateRangeLabel,
+  getDatesInRange,
   formatCurrency,
   formatNumber,
   formatPercent,
@@ -55,34 +55,37 @@ function TrafficLight({ verdict }: { verdict: VerdictResult }) {
 
 export default function ExecutiveView() {
   const { state } = useAppState();
+  const { current: currentRecords, previous: previousRecords } = useFilteredRecords();
 
   const data = useMemo(() => {
-    if (!state.selectedPeriodKey) return null;
-    const current = filterByPeriodWithFallback(state.records, state.selectedPeriodKey, state.truthSource);
-    const previous = state.comparisonPeriodKey
-      ? filterByPeriodWithFallback(state.records, state.comparisonPeriodKey, state.truthSource)
-      : [];
-    const currentMetrics = aggregateMetrics(current);
-    const previousMetrics = previous.length > 0 ? aggregateMetrics(previous) : null;
+    if (currentRecords.length === 0) return null;
+    const currentMetrics = aggregateMetrics(currentRecords);
+    const previousMetrics = previousRecords.length > 0 ? aggregateMetrics(previousRecords) : null;
     const delta = computeDeltas(currentMetrics, previousMetrics);
 
-    // Sparkline data (last 8 periods)
-    const periods = getAvailablePeriods(state.records, state.selectedGranularity).slice(0, 8).reverse();
-    const sparkData = periods.map(p => {
-      const recs = filterByPeriodWithFallback(state.records, p, state.truthSource);
+    // Sparkline data: all available dates in a wider range
+    const allDates = [...new Set(state.records.map(r => r.period_start))].sort().slice(-8);
+    const sparkData = allDates.map(d => {
+      const recs = state.records.filter(r => r.period_start === d);
       const agg = aggregateMetrics(recs);
-      return { period: getPeriodLabel(p, state.selectedGranularity), cost_per_result: agg.cost_per_result, results: agg.results, spend_brl: agg.spend_brl };
+      const dateObj = new Date(d + 'T00:00:00');
+      return {
+        period: dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        cost_per_result: agg.cost_per_result,
+        results: agg.results,
+        spend_brl: agg.spend_brl,
+      };
     });
 
     // Campaign verdicts
-    const rows = groupByLevel(current, previous, 'campaign', '', false);
+    const rows = groupByLevel(currentRecords, previousRecords, 'campaign', '', false);
     const verdicts = rows.map(row => ({
       row,
       verdict: computeVerdict(row, currentMetrics),
     }));
 
     // Auto summary
-    const periodLabel = getPeriodLabel(state.selectedPeriodKey, state.selectedGranularity);
+    const periodLabel = state.dateFrom && state.dateTo ? getDateRangeLabel(state.dateFrom, state.dateTo) : '';
     let summary = `Em ${periodLabel}, investimos ${formatCurrency(currentMetrics.spend_brl)} e trouxemos ${formatNumber(currentMetrics.results)} resultados a ${formatCurrency(currentMetrics.cost_per_result)} cada.`;
     if (previousMetrics) {
       const spendDelta = ((currentMetrics.spend_brl - previousMetrics.spend_brl) / (previousMetrics.spend_brl || 1)) * 100;
@@ -93,7 +96,7 @@ export default function ExecutiveView() {
     }
 
     return { currentMetrics, delta, sparkData, verdicts, summary };
-  }, [state.records, state.selectedPeriodKey, state.comparisonPeriodKey, state.truthSource, state.selectedGranularity]);
+  }, [currentRecords, previousRecords, state.records, state.dateFrom, state.dateTo]);
 
   if (!data) return <p className="text-muted-foreground text-center py-8">Selecione um período</p>;
 

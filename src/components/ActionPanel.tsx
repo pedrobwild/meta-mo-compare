@@ -1,14 +1,12 @@
 import { useMemo } from 'react';
-import { useAppState } from '@/lib/store';
+import { useAppState, useFilteredRecords } from '@/lib/store';
 import {
   aggregateMetrics,
-  filterByPeriodWithFallback,
   groupByLevel,
   formatCurrency,
   formatNumber,
 } from '@/lib/calculations';
 import { computeVerdict } from '@/lib/insights/verdicts';
-import { generateInsights } from '@/lib/insights/rules';
 import { computeDeltas } from '@/lib/calculations';
 import { Zap, ArrowUp, Pause, RefreshCw, Eye, Scale } from 'lucide-react';
 
@@ -22,13 +20,10 @@ interface ActionItem {
 
 export default function ActionPanel() {
   const { state } = useAppState();
+  const { current, previous } = useFilteredRecords();
 
   const actions = useMemo((): ActionItem[] => {
-    if (!state.selectedPeriodKey) return [];
-    const current = filterByPeriodWithFallback(state.records, state.selectedPeriodKey, state.truthSource);
-    const previous = state.comparisonPeriodKey
-      ? filterByPeriodWithFallback(state.records, state.comparisonPeriodKey, state.truthSource)
-      : [];
+    if (current.length === 0) return [];
     const avgMetrics = aggregateMetrics(current);
     const rows = groupByLevel(current, previous, state.analysisLevel, '', false);
     const items: ActionItem[] = [];
@@ -71,7 +66,6 @@ export default function ActionPanel() {
       }
     }
 
-    // Budget reallocation suggestion
     const scalable = rows.filter(r => computeVerdict(r, avgMetrics).verdict === 'scale');
     const pausable = rows.filter(r => computeVerdict(r, avgMetrics).verdict === 'pause');
     if (scalable.length > 0 && pausable.length > 0) {
@@ -86,7 +80,7 @@ export default function ActionPanel() {
     }
 
     return items;
-  }, [state.records, state.selectedPeriodKey, state.comparisonPeriodKey, state.truthSource, state.analysisLevel]);
+  }, [current, previous, state.analysisLevel]);
 
   if (actions.length === 0) return null;
 

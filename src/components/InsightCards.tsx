@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
-import { useAppState } from '@/lib/store';
+import { useAppState, useFilteredRecords } from '@/lib/store';
 import {
   aggregateMetrics,
   computeDeltas,
-  filterByPeriodWithFallback,
   groupByLevel,
 } from '@/lib/calculations';
 import { generateInsights } from '@/lib/insights/rules';
@@ -32,23 +31,18 @@ interface InsightCardsProps {
 
 export default function InsightCards({ onFilterTable }: InsightCardsProps) {
   const { state } = useAppState();
+  const { current, previous } = useFilteredRecords();
 
   const insights = useMemo(() => {
-    if (!state.selectedPeriodKey) return [];
-
-    const current = filterByPeriodWithFallback(state.records, state.selectedPeriodKey, state.truthSource);
-    const previous = state.comparisonPeriodKey
-      ? filterByPeriodWithFallback(state.records, state.comparisonPeriodKey, state.truthSource)
-      : [];
+    if (current.length === 0) return [];
 
     const currentMetrics = aggregateMetrics(current);
     const previousMetrics = previous.length > 0 ? aggregateMetrics(previous) : null;
     const delta = computeDeltas(currentMetrics, previousMetrics);
-
     const rows = groupByLevel(current, previous, state.analysisLevel, '', false);
 
     return generateInsights(currentMetrics, delta, rows);
-  }, [state.records, state.selectedPeriodKey, state.comparisonPeriodKey, state.truthSource, state.analysisLevel]);
+  }, [current, previous, state.analysisLevel]);
 
   if (insights.length === 0) return null;
 

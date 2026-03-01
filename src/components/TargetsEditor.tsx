@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAppState } from '@/lib/store';
-import { getPeriodLabel } from '@/lib/calculations';
+import { getDateRangeLabel } from '@/lib/calculations';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -23,20 +23,23 @@ const TARGET_FIELDS: { key: keyof PeriodTargets; label: string; prefix?: string 
 
 export default function TargetsEditor() {
   const { state, dispatch } = useAppState();
-  const periodKey = state.selectedPeriodKey;
+  const periodLabel = state.dateFrom && state.dateTo
+    ? getDateRangeLabel(state.dateFrom, state.dateTo)
+    : null;
+  const periodKey = state.dateFrom || '';
   const existing = state.targets.find(t => t.period_key === periodKey);
   const [open, setOpen] = useState(false);
 
   const [form, setForm] = useState<PeriodTargets>({
-    period_key: periodKey || '',
-    granularity: state.selectedGranularity,
+    period_key: periodKey,
+    granularity: 'day',
     ...existing,
   });
 
-  if (!periodKey) return null;
+  if (!periodLabel) return null;
 
   const save = () => {
-    dispatch({ type: 'SET_TARGETS', targets: { ...form, period_key: periodKey, granularity: state.selectedGranularity } });
+    dispatch({ type: 'SET_TARGETS', targets: { ...form, period_key: periodKey, granularity: 'day' } });
     toast.success('Metas salvas');
   };
 
@@ -47,7 +50,7 @@ export default function TargetsEditor() {
       <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover:bg-secondary/30 transition-colors rounded-lg">
         <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
           <Target className="h-4 w-4 text-primary" />
-          Metas — {getPeriodLabel(periodKey, state.selectedGranularity)}
+          Metas — {periodLabel}
           {hasTargets && <span className="text-xs text-muted-foreground">(definidas)</span>}
         </h3>
         <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
