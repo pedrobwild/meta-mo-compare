@@ -33,6 +33,7 @@ import AlertsView from '@/components/AlertsView';
 import AIChatPanel from '@/components/AIChatPanel';
 import AIRecommendationsPanel from '@/components/AIRecommendationsPanel';
 import FunnelRealView from '@/components/FunnelRealView';
+import CreativesView from '@/components/CreativesView';
 import Auth from '@/pages/Auth';
 
 function EmptyState() {
@@ -158,7 +159,7 @@ function DashboardContent() {
                 </ViewContainer>
               )}
 
-              {(activeTab === 'tactical' || activeTab === 'diagnostic' || activeTab === 'simulator') && !hasData && (
+              {(activeTab === 'tactical' || activeTab === 'diagnostic' || activeTab === 'simulator' || activeTab === 'creatives') && !hasData && (
                 <ViewContainer key="nodata">
                   <div className="text-center py-20 space-y-4">
                     <BarChart3 className="h-16 w-16 text-muted-foreground/20 mx-auto" />
@@ -173,6 +174,9 @@ function DashboardContent() {
               )}
               {activeTab === 'funnel-real' && (
                 <ViewContainer key="funnel-real"><FunnelRealView /></ViewContainer>
+              )}
+              {activeTab === 'creatives' && hasData && (
+                <ViewContainer key="creatives"><CreativesView /></ViewContainer>
               )}
               {activeTab === 'simulator' && hasData && (
                 <ViewContainer key="simulator"><BudgetSimulator /></ViewContainer>

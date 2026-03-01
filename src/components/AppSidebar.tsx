@@ -1,4 +1,4 @@
-import { Eye, Crosshair, ChartScatter, Activity, Calculator, FileText, History, GitBranch, Lightbulb, Cloud, RefreshCw, Trash2, BarChart3, Bell, Zap, Bot, LogOut, Users } from 'lucide-react';
+import { Eye, Crosshair, ChartScatter, Activity, Calculator, FileText, History, GitBranch, Lightbulb, Cloud, RefreshCw, Trash2, BarChart3, Bell, Zap, Bot, LogOut, Users, Palette } from 'lucide-react';
 import { useAppState } from '@/lib/store';
 import { useWorkspace } from '@/lib/workspace';
 import MetaSyncButton from './MetaSyncButton';
@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
-export type Tab = 'executive' | 'tactical' | 'diagnostic' | 'funnel' | 'funnel-real' | 'simulator' | 'report' | 'decisions' | 'health' | 'missing' | 'alerts' | 'actions' | 'ai';
+export type Tab = 'executive' | 'tactical' | 'diagnostic' | 'funnel' | 'funnel-real' | 'creatives' | 'simulator' | 'report' | 'decisions' | 'health' | 'missing' | 'alerts' | 'actions' | 'ai';
 
 const NAV_GROUPS = [
   {
@@ -28,6 +28,7 @@ const NAV_GROUPS = [
       { key: 'executive' as Tab, label: 'Executivo', icon: Eye, description: 'Visão geral e semáforos' },
       { key: 'tactical' as Tab, label: 'Tático', icon: Crosshair, description: 'KPIs, insights e ações' },
       { key: 'diagnostic' as Tab, label: 'Diagnóstico', icon: ChartScatter, description: 'Gráficos avançados' },
+      { key: 'creatives' as Tab, label: 'Criativos', icon: Palette, description: 'Ciclo de vida de anúncios' },
       { key: 'alerts' as Tab, label: 'Alertas', icon: Bell, description: 'Regras e eventos' },
       { key: 'actions' as Tab, label: 'Ações', icon: Zap, description: 'Recomendações' },
       { key: 'ai' as Tab, label: 'IA Analyst', icon: Bot, description: 'Chat e recomendações IA' },
