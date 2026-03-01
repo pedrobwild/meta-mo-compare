@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useAppState, useFilteredRecords } from '@/lib/store';
+import { useCrossFilter } from '@/lib/crossFilter';
 import {
   aggregateMetrics,
   groupByLevel,
@@ -25,7 +26,28 @@ const COLORS = [
 
 export default function AdvancedCharts() {
   const { state } = useAppState();
-  const { current, previous } = useFilteredRecords();
+  const { current: rawCurrent, previous: rawPrevious } = useFilteredRecords();
+  const { filter: crossFilter } = useCrossFilter();
+
+  const current = useMemo(() => {
+    if (!crossFilter.key || !crossFilter.level) return rawCurrent;
+    return rawCurrent.filter(r => {
+      if (crossFilter.level === 'campaign') return (r.campaign_key || 'sem-campanha') === crossFilter.key;
+      if (crossFilter.level === 'adset') return (r.adset_key || 'sem-conjunto') === crossFilter.key;
+      if (crossFilter.level === 'ad') return r.ad_key === crossFilter.key;
+      return true;
+    });
+  }, [rawCurrent, crossFilter]);
+
+  const previous = useMemo(() => {
+    if (!crossFilter.key || !crossFilter.level) return rawPrevious;
+    return rawPrevious.filter(r => {
+      if (crossFilter.level === 'campaign') return (r.campaign_key || 'sem-campanha') === crossFilter.key;
+      if (crossFilter.level === 'adset') return (r.adset_key || 'sem-conjunto') === crossFilter.key;
+      if (crossFilter.level === 'ad') return r.ad_key === crossFilter.key;
+      return true;
+    });
+  }, [rawPrevious, crossFilter]);
 
   const data = useMemo(() => {
     if (current.length === 0) return null;
@@ -62,10 +84,10 @@ export default function AdvancedCharts() {
       };
     });
 
-    // Temporal data: per-date metrics
-    const allDates = [...new Set(state.records.map(r => r.period_start))].sort().slice(-8);
+    // Temporal data: per-date metrics (use cross-filtered current records)
+    const allDates = [...new Set(current.map(r => r.period_start))].sort().slice(-8);
     const temporalData = allDates.map(d => {
-      const recs = state.records.filter(r => r.period_start === d);
+      const recs = current.filter(r => r.period_start === d);
       const agg = aggregateMetrics(recs);
       const dateObj = new Date(d + 'T00:00:00');
       return {
