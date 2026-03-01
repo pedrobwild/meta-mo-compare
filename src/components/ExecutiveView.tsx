@@ -12,6 +12,7 @@ import {
 import { computeVerdict, type VerdictResult } from '@/lib/insights/verdicts';
 import type { LeadQualityMetrics } from '@/lib/types';
 import { TrendingUp, TrendingDown, Minus, Activity, AlertTriangle } from 'lucide-react';
+import AdComparisonSelector from '@/components/AdComparisonSelector';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -477,6 +478,9 @@ export default function ExecutiveView() {
           );
         })}
       </div>
+
+      {/* Ad Comparison Selector — right after hero KPIs */}
+      <AdComparisonSelector />
 
       {/* Campaign Semaphores */}
       <div className="glass-panel p-4">
