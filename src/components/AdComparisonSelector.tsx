@@ -193,6 +193,12 @@ export default function AdComparisonSelector() {
               const aWins = !equal && (kpi.lowerIsBetter ? va < vb : va > vb);
               const bWins = !equal && !aWins;
 
+              // Calculate % difference (A relative to B)
+              const diffPct = vb !== 0 ? ((va - vb) / Math.abs(vb)) * 100 : va !== 0 ? 100 : 0;
+              const absDiff = Math.abs(diffPct);
+              // For "lower is better" metrics, negative diff means A is better
+              const diffIsGood = kpi.lowerIsBetter ? diffPct < 0 : diffPct > 0;
+
               return (
                 <div key={kpi.key as string} className="border border-border/40 rounded-lg p-3 bg-surface-1/30">
                   <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
@@ -200,7 +206,7 @@ export default function AdComparisonSelector() {
                   </div>
                   <div className="flex items-end justify-between gap-2">
                     {/* Value A */}
-                    <div className={`flex-1 ${aWins ? '' : ''}`}>
+                    <div className="flex-1">
                       <div className={`text-sm font-bold font-mono ${
                         aWins ? 'text-primary' : bWins ? 'text-muted-foreground' : 'text-foreground'
                       }`}>
@@ -214,8 +220,17 @@ export default function AdComparisonSelector() {
                       )}
                     </div>
 
-                    {/* Divider */}
-                    <div className="text-[10px] text-muted-foreground/40 font-mono self-center pb-1">vs</div>
+                    {/* Divider + diff */}
+                    <div className="flex flex-col items-center pb-1 flex-shrink-0">
+                      <div className="text-[10px] text-muted-foreground/40 font-mono">vs</div>
+                      {!equal && absDiff > 0.1 && (
+                        <div className={`text-[9px] font-mono font-semibold mt-0.5 ${
+                          diffIsGood ? 'text-positive' : 'text-negative'
+                        }`}>
+                          {diffPct > 0 ? '+' : ''}{diffPct.toFixed(1)}%
+                        </div>
+                      )}
+                    </div>
 
                     {/* Value B */}
                     <div className="flex-1 text-right">
