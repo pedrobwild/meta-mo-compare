@@ -136,7 +136,6 @@ function DashboardContent() {
                 <ViewContainer key="executive">
                   <AlertsBanner />
                   <ExecutiveView />
-                  <AdComparisonSelector />
                   <PacingCard />
                 </ViewContainer>
               )}
