@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { useAppState } from '@/lib/store';
-import { getMonthLabel } from '@/lib/calculations';
+import { getPeriodLabel } from '@/lib/calculations';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Save, Target, ChevronDown } from 'lucide-react';
-import type { MonthlyTargets } from '@/lib/types';
+import type { PeriodTargets } from '@/lib/types';
 import { toast } from 'sonner';
 
-const TARGET_FIELDS: { key: keyof MonthlyTargets; label: string; prefix?: string }[] = [
+const TARGET_FIELDS: { key: keyof PeriodTargets; label: string; prefix?: string }[] = [
   { key: 'spend', label: 'Investimento', prefix: 'R$' },
   { key: 'results', label: 'Resultados' },
   { key: 'ctr_link', label: 'CTR Link (%)' },
@@ -23,30 +23,31 @@ const TARGET_FIELDS: { key: keyof MonthlyTargets; label: string; prefix?: string
 
 export default function TargetsEditor() {
   const { state, dispatch } = useAppState();
-  const month = state.selectedMonth;
-  const existing = state.targets.find(t => t.month_key === month);
+  const periodKey = state.selectedPeriodKey;
+  const existing = state.targets.find(t => t.period_key === periodKey);
   const [open, setOpen] = useState(false);
 
-  const [form, setForm] = useState<MonthlyTargets>({
-    month_key: month || '',
+  const [form, setForm] = useState<PeriodTargets>({
+    period_key: periodKey || '',
+    granularity: state.selectedGranularity,
     ...existing,
   });
 
-  if (!month) return null;
+  if (!periodKey) return null;
 
   const save = () => {
-    dispatch({ type: 'SET_TARGETS', targets: { ...form, month_key: month } });
+    dispatch({ type: 'SET_TARGETS', targets: { ...form, period_key: periodKey, granularity: state.selectedGranularity } });
     toast.success('Metas salvas');
   };
 
-  const hasTargets = existing && Object.keys(existing).some(k => k !== 'month_key' && (existing as any)[k]);
+  const hasTargets = existing && Object.keys(existing).some(k => k !== 'period_key' && k !== 'granularity' && (existing as any)[k]);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="glass-card">
       <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover:bg-secondary/30 transition-colors rounded-lg">
         <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
           <Target className="h-4 w-4 text-primary" />
-          Metas — {getMonthLabel(month)}
+          Metas — {getPeriodLabel(periodKey, state.selectedGranularity)}
           {hasTargets && <span className="text-xs text-muted-foreground">(definidas)</span>}
         </h3>
         <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />

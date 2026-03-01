@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAppState } from '@/lib/store';
-import { formatCurrency, formatNumber, formatPercent, computeFunnel, aggregateMetrics, filterByTruthSourceWithFallback, getMonthLabel } from '@/lib/calculations';
+import { formatCurrency, formatNumber, formatPercent, computeFunnel, aggregateMetrics, filterByPeriodWithFallback, getPeriodLabel } from '@/lib/calculations';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -10,29 +10,30 @@ import { toast } from 'sonner';
 
 export default function FunnelView() {
   const { state, dispatch } = useAppState();
-  const month = state.selectedMonth;
-  const compMonth = state.comparisonMonth;
+  const periodKey = state.selectedPeriodKey;
+  const compPeriodKey = state.comparisonPeriodKey;
 
-  const existing = state.funnelData.find(f => f.month_key === month);
+  const existing = state.funnelData.find(f => f.period_key === periodKey);
   const [form, setForm] = useState<FunnelData>({
-    month_key: month || '',
+    period_key: periodKey || '',
+    granularity: state.selectedGranularity,
     mql: existing?.mql ?? 0,
     sql: existing?.sql ?? 0,
     vendas: existing?.vendas ?? 0,
     receita: existing?.receita ?? 0,
   });
 
-  if (!month) return <p className="text-muted-foreground text-center py-8">Selecione um mês</p>;
+  if (!periodKey) return <p className="text-muted-foreground text-center py-8">Selecione um período</p>;
 
-  const metrics = aggregateMetrics(filterByTruthSourceWithFallback(state.records, month, state.truthSource));
+  const metrics = aggregateMetrics(filterByPeriodWithFallback(state.records, periodKey, state.truthSource));
   const funnel = computeFunnel(existing || form, metrics);
 
-  const prevFunnel = compMonth ? state.funnelData.find(f => f.month_key === compMonth) : null;
-  const prevMetrics = compMonth ? aggregateMetrics(filterByTruthSourceWithFallback(state.records, compMonth, state.truthSource)) : null;
+  const prevFunnel = compPeriodKey ? state.funnelData.find(f => f.period_key === compPeriodKey) : null;
+  const prevMetrics = compPeriodKey ? aggregateMetrics(filterByPeriodWithFallback(state.records, compPeriodKey, state.truthSource)) : null;
   const prevComputed = prevFunnel && prevMetrics ? computeFunnel(prevFunnel, prevMetrics) : null;
 
   const save = () => {
-    dispatch({ type: 'SET_FUNNEL', funnel: { ...form, month_key: month } });
+    dispatch({ type: 'SET_FUNNEL', funnel: { ...form, period_key: periodKey, granularity: state.selectedGranularity } });
     toast.success('Dados do funil salvos');
   };
 
@@ -45,9 +46,8 @@ export default function FunnelView() {
 
   return (
     <div className="space-y-6">
-      {/* Input form */}
       <div className="glass-card p-5">
-        <h3 className="text-sm font-medium text-foreground mb-4">Dados Manuais — {getMonthLabel(month)}</h3>
+        <h3 className="text-sm font-medium text-foreground mb-4">Dados Manuais — {getPeriodLabel(periodKey, state.selectedGranularity)}</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {(['mql', 'sql', 'vendas', 'receita'] as const).map(field => (
             <div key={field} className="space-y-1.5">
@@ -66,7 +66,6 @@ export default function FunnelView() {
         </Button>
       </div>
 
-      {/* Funnel visualization */}
       {funnel && (
         <>
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
@@ -92,7 +91,6 @@ export default function FunnelView() {
             ))}
           </div>
 
-          {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: 'Ticket Médio', value: formatCurrency(funnel.ticket_medio) },

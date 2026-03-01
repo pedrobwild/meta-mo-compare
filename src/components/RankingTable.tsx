@@ -1,18 +1,17 @@
 import { useMemo, useState, Fragment } from 'react';
 import { useAppState } from '@/lib/store';
 import {
-  filterByTruthSourceWithFallback,
+  filterByPeriodWithFallback,
   groupByLevel,
-  aggregateMetrics,
-  computeDeltas,
   formatCurrency,
   formatNumber,
   formatPercent,
   type GroupedRow,
 } from '@/lib/calculations';
 import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
-type SortKey = 'name' | 'spend_brl' | 'results' | 'cost_per_result' | 'ctr_link' | 'cpc_link' | 'link_clicks' | 'impressions' | 'landing_page_views' | 'cpm';
+type SortKey = 'name' | 'spend_brl' | 'results' | 'cost_per_result' | 'ctr_link' | 'cpc_link' | 'link_clicks' | 'impressions' | 'landing_page_views' | 'cpm' | 'lpv_rate' | 'qualified_ctr';
 
 const columns: { key: SortKey; label: string; format: (v: number) => string; invertDelta?: boolean }[] = [
   { key: 'spend_brl', label: 'Invest.', format: formatCurrency },
@@ -24,7 +23,39 @@ const columns: { key: SortKey; label: string; format: (v: number) => string; inv
   { key: 'results', label: 'Result.', format: v => formatNumber(v) },
   { key: 'cost_per_result', label: 'CPA', format: formatCurrency, invertDelta: true },
   { key: 'landing_page_views', label: 'LPV', format: v => formatNumber(v) },
+  { key: 'lpv_rate', label: 'LPV Rate', format: v => formatPercent(v * 100) },
+  { key: 'qualified_ctr', label: 'Q.CTR', format: v => formatPercent(v) },
 ];
+
+// Detect badges based on metrics
+function getBadges(row: GroupedRow): { label: string; variant: 'default' | 'destructive' | 'secondary' | 'outline' }[] {
+  const badges: { label: string; variant: 'default' | 'destructive' | 'secondary' | 'outline' }[] = [];
+  const m = row.metrics;
+  const d = row.delta;
+
+  // Fadiga: freq high + CTR dropping
+  if (m.frequency > 3 && d.deltas['ctr_link']?.percent && d.deltas['ctr_link'].percent < -10) {
+    badges.push({ label: 'Fadiga', variant: 'destructive' });
+  }
+
+  // Clique ruim: CPC baixo + Cost/LPV alto
+  if (m.cpc_link > 0 && m.cost_per_lpv > m.cpc_link * 3) {
+    badges.push({ label: 'Clique ruim', variant: 'destructive' });
+  }
+
+  // Leilão: CPM subindo + CTR estável
+  if (d.deltas['cpm']?.percent && d.deltas['cpm'].percent > 15
+    && d.deltas['ctr_link']?.percent && Math.abs(d.deltas['ctr_link'].percent) < 5) {
+    badges.push({ label: 'Leilão', variant: 'secondary' });
+  }
+
+  // Pós-clique: lpv_rate baixo
+  if (m.lpv_rate > 0 && m.lpv_rate < 0.5) {
+    badges.push({ label: 'Pós-clique', variant: 'outline' });
+  }
+
+  return badges;
+}
 
 export default function RankingTable() {
   const { state } = useAppState();
@@ -33,19 +64,19 @@ export default function RankingTable() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const currentRecords = useMemo(() => {
-    if (!state.selectedMonth) return [];
-    return filterByTruthSourceWithFallback(state.records, state.selectedMonth, state.truthSource);
-  }, [state.records, state.selectedMonth, state.truthSource]);
+    if (!state.selectedPeriodKey) return [];
+    return filterByPeriodWithFallback(state.records, state.selectedPeriodKey, state.truthSource);
+  }, [state.records, state.selectedPeriodKey, state.truthSource]);
 
   const previousRecords = useMemo(() => {
-    if (!state.comparisonMonth) return [];
-    return filterByTruthSourceWithFallback(state.records, state.comparisonMonth, state.truthSource);
-  }, [state.records, state.comparisonMonth, state.truthSource]);
+    if (!state.comparisonPeriodKey) return [];
+    return filterByPeriodWithFallback(state.records, state.comparisonPeriodKey, state.truthSource);
+  }, [state.records, state.comparisonPeriodKey, state.truthSource]);
 
   const rows = useMemo(() => {
-    if (!state.selectedMonth) return [];
+    if (!state.selectedPeriodKey) return [];
     return groupByLevel(currentRecords, previousRecords, state.analysisLevel, state.searchQuery, state.includeInactive);
-  }, [currentRecords, previousRecords, state.analysisLevel, state.searchQuery, state.includeInactive, state.selectedMonth]);
+  }, [currentRecords, previousRecords, state.analysisLevel, state.searchQuery, state.includeInactive, state.selectedPeriodKey]);
 
   const sorted = useMemo(() => {
     return [...rows].sort((a, b) => {
@@ -72,20 +103,16 @@ export default function RankingTable() {
     });
   };
 
-  // Get child rows for drill-down
   const getChildren = (parentKey: string, parentLevel: 'campaign' | 'adset'): GroupedRow[] => {
     const childLevel = parentLevel === 'campaign' ? 'adset' : 'ad';
-
     const filterByParent = (recs: typeof currentRecords) => {
       if (parentLevel === 'campaign') {
         return recs.filter(r => (r.campaign_key || 'sem-campanha') === parentKey);
       }
       return recs.filter(r => (r.adset_key || 'sem-conjunto') === parentKey);
     };
-
     const childCurrent = filterByParent(currentRecords);
     const childPrevious = filterByParent(previousRecords);
-
     return groupByLevel(childCurrent, childPrevious, childLevel as any, '', state.includeInactive)
       .sort((a, b) => b.metrics.spend_brl - a.metrics.spend_brl);
   };
@@ -111,11 +138,12 @@ export default function RankingTable() {
     );
   };
 
-  const renderRow = (row: GroupedRow, depth: number, parentLevel?: 'campaign' | 'adset') => {
+  const renderRow = (row: GroupedRow, depth: number) => {
     const isExpanded = expanded.has(row.key);
     const showExpander = canDrillDown && depth === 0 && state.analysisLevel !== 'ad';
     const childLevel = state.analysisLevel === 'campaign' ? 'campaign' : 'adset';
     const indent = depth * 24;
+    const badges = depth === 0 ? getBadges(row) : [];
 
     return (
       <Fragment key={`${depth}-${row.key}`}>
@@ -123,17 +151,24 @@ export default function RankingTable() {
           className={`border-b border-border/50 hover:bg-secondary/50 transition-colors ${showExpander ? 'cursor-pointer' : ''} ${depth > 0 ? 'bg-secondary/20' : ''}`}
           onClick={showExpander ? () => toggleExpand(row.key) : undefined}
         >
-          <td className="p-3 max-w-[250px]">
+          <td className="p-3 max-w-[280px]">
             <div className="flex items-center gap-1" style={{ paddingLeft: `${indent}px` }}>
               {showExpander && (
-                <ChevronRight
-                  className={`h-3.5 w-3.5 text-muted-foreground flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                />
+                <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
               )}
               {depth > 0 && !showExpander && <span className="w-3.5 flex-shrink-0" />}
-              <p className={`truncate ${depth === 0 ? 'text-foreground font-medium' : 'text-muted-foreground text-xs'}`}>
-                {row.name}
-              </p>
+              <div className="min-w-0">
+                <p className={`truncate ${depth === 0 ? 'text-foreground font-medium' : 'text-muted-foreground text-xs'}`}>
+                  {row.name}
+                </p>
+                {badges.length > 0 && (
+                  <div className="flex gap-1 mt-0.5">
+                    {badges.map(b => (
+                      <Badge key={b.label} variant={b.variant} className="text-[10px] px-1.5 py-0">{b.label}</Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </td>
           {columns.map(col => (
@@ -148,9 +183,7 @@ export default function RankingTable() {
           ))}
         </tr>
         {isExpanded && getChildren(row.key, childLevel as any).map(child => {
-          const nextLevel = childLevel === 'campaign' ? 'adset' : undefined;
-          if (nextLevel && state.analysisLevel === 'campaign') {
-            // Campaign -> show adsets, each adset can expand to ads
+          if (state.analysisLevel === 'campaign') {
             return renderAdsetRow(child, 1);
           }
           return renderRow(child, 1);
@@ -176,11 +209,9 @@ export default function RankingTable() {
             });
           }}
         >
-          <td className="p-3 max-w-[250px]">
+          <td className="p-3 max-w-[280px]">
             <div className="flex items-center gap-1" style={{ paddingLeft: `${indent}px` }}>
-              <ChevronRight
-                className={`h-3.5 w-3.5 text-muted-foreground flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-              />
+              <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
               <p className="text-muted-foreground text-xs truncate">{row.name}</p>
             </div>
           </td>

@@ -2,25 +2,15 @@ import { useMemo } from 'react';
 import { useAppState } from '@/lib/store';
 import {
   aggregateMetrics,
-  filterByTruthSourceWithFallback,
-  getMonthLabel,
-  getAvailableMonths,
+  filterByPeriodWithFallback,
+  getAvailablePeriods,
+  getPeriodLabel,
   formatCurrency,
   formatNumber,
   formatPercent,
 } from '@/lib/calculations';
-import type { AggregatedMetrics } from '@/lib/types';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  Legend,
-  LineChart,
-  Line,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend, LineChart, Line,
 } from 'recharts';
 
 const CHART_GROUPS = [
@@ -32,7 +22,6 @@ const CHART_GROUPS = [
       { key: 'link_clicks', label: 'Cliques', format: (v: number) => formatNumber(v) },
       { key: 'results', label: 'Resultados', format: (v: number) => formatNumber(v) },
     ],
-    type: 'bar' as const,
   },
   {
     title: 'Eficiência',
@@ -42,15 +31,15 @@ const CHART_GROUPS = [
       { key: 'cost_per_result', label: 'Custo/Resultado', format: formatCurrency },
       { key: 'cost_per_lpv', label: 'Custo/LPV', format: formatCurrency },
     ],
-    type: 'bar' as const,
   },
   {
-    title: 'Taxas',
+    title: 'Taxas & Derivados',
     metrics: [
       { key: 'ctr_link', label: 'CTR Link (%)', format: (v: number) => formatPercent(v) },
       { key: 'frequency', label: 'Frequência', format: (v: number) => formatNumber(v, 2) },
+      { key: 'lpv_rate', label: 'LPV Rate', format: (v: number) => formatPercent(v * 100) },
+      { key: 'qualified_ctr', label: 'Qualified CTR', format: (v: number) => formatPercent(v) },
     ],
-    type: 'bar' as const,
   },
 ];
 
@@ -58,18 +47,19 @@ export default function OverviewCharts() {
   const { state } = useAppState();
 
   const data = useMemo(() => {
-    const months = getAvailableMonths(state.records);
-    if (months.length === 0) return [];
+    const periods = getAvailablePeriods(state.records, state.selectedGranularity);
+    if (periods.length === 0) return [];
 
-    return months
-      .slice()
+    // Show last 8 periods (rolling window)
+    return periods
+      .slice(0, 8)
       .reverse()
-      .map(m => {
-        const recs = filterByTruthSourceWithFallback(state.records, m, state.truthSource);
+      .map(p => {
+        const recs = filterByPeriodWithFallback(state.records, p, state.truthSource);
         const agg = aggregateMetrics(recs);
-        return { month: m, label: getMonthLabel(m), ...agg };
+        return { period: p, label: getPeriodLabel(p, state.selectedGranularity), ...agg };
       });
-  }, [state.records, state.truthSource]);
+  }, [state.records, state.truthSource, state.selectedGranularity]);
 
   if (data.length === 0) return null;
 
@@ -90,17 +80,11 @@ export default function OverviewCharts() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
-                        <XAxis
-                          dataKey="label"
-                          tick={{ fontSize: 11 }}
-                          className="fill-muted-foreground"
-                        />
+                        <XAxis dataKey="label" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
                         <YAxis
                           tick={{ fontSize: 10 }}
                           className="fill-muted-foreground"
-                          tickFormatter={(v: number) =>
-                            v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(Math.round(v * 100) / 100)
-                          }
+                          tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(Math.round(v * 100) / 100)}
                           width={50}
                         />
                         <Tooltip
@@ -113,12 +97,7 @@ export default function OverviewCharts() {
                             color: 'hsl(var(--foreground))',
                           }}
                         />
-                        <Bar
-                          dataKey={metric.key}
-                          fill="hsl(var(--primary))"
-                          radius={[4, 4, 0, 0]}
-                          maxBarSize={60}
-                        />
+                        <Bar dataKey={metric.key} fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={60} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -129,15 +108,16 @@ export default function OverviewCharts() {
         </div>
       ))}
 
-      {/* Trend line chart for key metrics when 2+ months */}
       {data.length >= 2 && (
         <div className="glass-card p-5">
-          <h3 className="text-sm font-medium text-foreground mb-4">Tendência MoM</h3>
+          <h3 className="text-sm font-medium text-foreground mb-4">
+            Tendência {state.selectedGranularity === 'week' ? 'Semanal' : 'Diária'}
+          </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                <XAxis dataKey="label" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
                 <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" width={50} />
                 <Tooltip
                   contentStyle={{
@@ -149,30 +129,9 @@ export default function OverviewCharts() {
                   }}
                 />
                 <Legend wrapperStyle={{ fontSize: '11px' }} />
-                <Line
-                  type="monotone"
-                  dataKey="spend_brl"
-                  name="Investimento"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  dot={{ r: 4, fill: 'hsl(var(--primary))' }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="link_clicks"
-                  name="Cliques"
-                  stroke="hsl(var(--accent-foreground))"
-                  strokeWidth={2}
-                  dot={{ r: 4, fill: 'hsl(var(--accent-foreground))' }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="results"
-                  name="Resultados"
-                  stroke="hsl(var(--destructive))"
-                  strokeWidth={2}
-                  dot={{ r: 4, fill: 'hsl(var(--destructive))' }}
-                />
+                <Line type="monotone" dataKey="spend_brl" name="Investimento" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4, fill: 'hsl(var(--primary))' }} />
+                <Line type="monotone" dataKey="link_clicks" name="Cliques" stroke="hsl(var(--accent-foreground))" strokeWidth={2} dot={{ r: 4, fill: 'hsl(var(--accent-foreground))' }} />
+                <Line type="monotone" dataKey="results" name="Resultados" stroke="hsl(var(--destructive))" strokeWidth={2} dot={{ r: 4, fill: 'hsl(var(--destructive))' }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

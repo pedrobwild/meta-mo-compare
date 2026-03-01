@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
 import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2, FlaskConical } from 'lucide-react';
-import { parseFile, upsertRecords, buildHierarchyMaps, enrichRecords } from '@/lib/parser';
+import { parseFile } from '@/lib/parser';
 import { useAppState } from '@/lib/store';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { getPeriodLabel } from '@/lib/calculations';
 
 export default function FileUpload() {
   const { state, dispatch } = useAppState();
@@ -13,15 +14,9 @@ export default function FileUpload() {
   const handleFile = useCallback(async (file: File) => {
     setProcessing(true);
     try {
-      const { records, log, crossMonthWarning } = await parseFile(file);
-      
-      if (crossMonthWarning) {
-        toast.warning(crossMonthWarning);
-      }
-
-      // Use functional approach - dispatch handles merge in reducer
+      const { records, log } = await parseFile(file);
       dispatch({ type: 'IMPORT_FILE', newRecords: records, log });
-      toast.success(`${file.name}: ${log.records_count} registros importados (${log.month_key})`);
+      toast.success(`${file.name}: ${log.records_count} registros importados (${getPeriodLabel(log.period_key, log.granularity)})`);
     } catch (err: any) {
       toast.error(err.message || 'Erro ao processar arquivo');
     } finally {
@@ -83,7 +78,7 @@ export default function FileUpload() {
               <FileSpreadsheet className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <span className="text-muted-foreground truncate">{log.filename}</span>
               <span className="text-muted-foreground">•</span>
-              <span className="text-foreground">{log.month_key}</span>
+              <span className="text-foreground">{getPeriodLabel(log.period_key, log.granularity)}</span>
               <span className="text-muted-foreground">•</span>
               <span className="text-muted-foreground">{log.records_count} registros</span>
             </div>
@@ -91,7 +86,6 @@ export default function FileUpload() {
         </div>
       )}
 
-      {/* Test data loader */}
       <div className="mt-4 border-t border-border pt-4">
         <Button
           variant="outline"
@@ -118,7 +112,7 @@ export default function FileUpload() {
           }}
         >
           <FlaskConical className="h-4 w-4" />
-          Carregar dados de teste (Jan + Fev)
+          Carregar dados de teste
         </Button>
       </div>
     </div>

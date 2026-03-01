@@ -1,39 +1,55 @@
 import { useAppState } from '@/lib/store';
-import { getAvailableMonths, getMonthLabel } from '@/lib/calculations';
+import { getAvailablePeriods, getAvailableGranularities, getPeriodLabel } from '@/lib/calculations';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import type { TruthSource, AnalysisLevel } from '@/lib/types';
+import type { TruthSource, AnalysisLevel, PeriodGranularity } from '@/lib/types';
 
 export default function GlobalFilters() {
   const { state, dispatch } = useAppState();
-  const months = getAvailableMonths(state.records);
+  const granularities = getAvailableGranularities(state.records);
+  const periods = getAvailablePeriods(state.records, state.selectedGranularity);
 
-  if (months.length === 0) return null;
+  if (periods.length === 0) return null;
 
   return (
     <div className="flex flex-wrap items-end gap-4 glass-card p-4">
+      {granularities.length > 1 && (
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Granularidade</Label>
+          <Select value={state.selectedGranularity} onValueChange={g => dispatch({ type: 'SET_GRANULARITY', granularity: g as PeriodGranularity })}>
+            <SelectTrigger className="w-[120px] bg-secondary border-border">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week">Semanal</SelectItem>
+              <SelectItem value="day">Diário</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Mês Atual</Label>
-        <Select value={state.selectedMonth || ''} onValueChange={m => dispatch({ type: 'SET_SELECTED_MONTH', month: m })}>
-          <SelectTrigger className="w-[140px] bg-secondary border-border">
+        <Label className="text-xs text-muted-foreground">Período Atual</Label>
+        <Select value={state.selectedPeriodKey || ''} onValueChange={p => dispatch({ type: 'SET_SELECTED_PERIOD', periodKey: p })}>
+          <SelectTrigger className="w-[160px] bg-secondary border-border">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {months.map(m => <SelectItem key={m} value={m}>{getMonthLabel(m)}</SelectItem>)}
+            {periods.map(p => <SelectItem key={p} value={p}>{getPeriodLabel(p, state.selectedGranularity)}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
 
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Comparar com</Label>
-        <Select value={state.comparisonMonth || ''} onValueChange={m => dispatch({ type: 'SET_COMPARISON_MONTH', month: m })}>
-          <SelectTrigger className="w-[140px] bg-secondary border-border">
+        <Select value={state.comparisonPeriodKey || ''} onValueChange={p => dispatch({ type: 'SET_COMPARISON_PERIOD', periodKey: p })}>
+          <SelectTrigger className="w-[160px] bg-secondary border-border">
             <SelectValue placeholder="Nenhum" />
           </SelectTrigger>
           <SelectContent>
-            {months.map(m => <SelectItem key={m} value={m}>{getMonthLabel(m)}</SelectItem>)}
+            {periods.map(p => <SelectItem key={p} value={p}>{getPeriodLabel(p, state.selectedGranularity)}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>

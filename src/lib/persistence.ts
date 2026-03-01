@@ -1,7 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { MetaRecord, MonthlyTargets, FunnelData, SourceType } from './types';
+import type { MetaRecord, PeriodTargets, FunnelData, SourceType, PeriodGranularity } from './types';
 
-// Load all records from database
 export async function loadRecords(): Promise<MetaRecord[]> {
   const { data, error } = await supabase
     .from('meta_records')
@@ -15,6 +14,10 @@ export async function loadRecords(): Promise<MetaRecord[]> {
 
   return (data || []).map((r: any) => ({
     unique_key: r.unique_key,
+    period_start: r.period_start || r.report_start || 'unknown',
+    period_end: r.period_end || r.report_end || 'unknown',
+    period_key: r.period_key || r.month_key || 'unknown',
+    granularity: (r.granularity || 'week') as PeriodGranularity,
     month_key: r.month_key,
     ad_key: r.ad_key,
     campaign_key: r.campaign_key,
@@ -46,12 +49,15 @@ export async function loadRecords(): Promise<MetaRecord[]> {
   }));
 }
 
-// Save records to database (upsert by unique_key + month_key)
 export async function saveRecords(records: MetaRecord[]): Promise<void> {
   if (records.length === 0) return;
 
   const rows = records.map(r => ({
     unique_key: r.unique_key,
+    period_start: r.period_start,
+    period_end: r.period_end,
+    period_key: r.period_key,
+    granularity: r.granularity,
     month_key: r.month_key,
     ad_key: r.ad_key,
     campaign_key: r.campaign_key,
@@ -82,18 +88,16 @@ export async function saveRecords(records: MetaRecord[]): Promise<void> {
     report_end: r.report_end,
   }));
 
-  // Upsert in batches of 500
   for (let i = 0; i < rows.length; i += 500) {
     const batch = rows.slice(i, i + 500);
     const { error } = await supabase
       .from('meta_records')
-      .upsert(batch as any, { onConflict: 'unique_key,month_key' });
+      .upsert(batch as any, { onConflict: 'unique_key,period_key,granularity' });
     if (error) console.error('Error saving records batch:', error);
   }
 }
 
-// Load targets
-export async function loadTargets(): Promise<MonthlyTargets[]> {
+export async function loadTargets(): Promise<PeriodTargets[]> {
   const { data, error } = await supabase
     .from('monthly_targets')
     .select('*');
@@ -104,7 +108,8 @@ export async function loadTargets(): Promise<MonthlyTargets[]> {
   }
 
   return (data || []).map((t: any) => ({
-    month_key: t.month_key,
+    period_key: t.period_key || t.month_key,
+    granularity: (t.granularity || 'week') as PeriodGranularity,
     spend: t.spend != null ? Number(t.spend) : undefined,
     results: t.results != null ? Number(t.results) : undefined,
     ctr_link: t.ctr_link != null ? Number(t.ctr_link) : undefined,
@@ -121,10 +126,11 @@ export async function loadTargets(): Promise<MonthlyTargets[]> {
   }));
 }
 
-// Save a single target
-export async function saveTarget(target: MonthlyTargets): Promise<void> {
+export async function saveTarget(target: PeriodTargets): Promise<void> {
   const row = {
-    month_key: target.month_key,
+    period_key: target.period_key,
+    granularity: target.granularity,
+    month_key: target.period_key, // backward compat
     spend: target.spend ?? null,
     results: target.results ?? null,
     ctr_link: target.ctr_link ?? null,
@@ -147,7 +153,6 @@ export async function saveTarget(target: MonthlyTargets): Promise<void> {
   if (error) console.error('Error saving target:', error);
 }
 
-// Load funnel data
 export async function loadFunnelData(): Promise<FunnelData[]> {
   const { data, error } = await supabase
     .from('funnel_data')
@@ -159,7 +164,8 @@ export async function loadFunnelData(): Promise<FunnelData[]> {
   }
 
   return (data || []).map((f: any) => ({
-    month_key: f.month_key,
+    period_key: f.period_key || f.month_key,
+    granularity: (f.granularity || 'week') as PeriodGranularity,
     mql: Number(f.mql),
     sql: Number(f.sql_count),
     vendas: Number(f.vendas),
@@ -167,10 +173,11 @@ export async function loadFunnelData(): Promise<FunnelData[]> {
   }));
 }
 
-// Save funnel data
 export async function saveFunnel(funnel: FunnelData): Promise<void> {
   const row = {
-    month_key: funnel.month_key,
+    period_key: funnel.period_key,
+    granularity: funnel.granularity,
+    month_key: funnel.period_key, // backward compat
     mql: funnel.mql,
     sql_count: funnel.sql,
     vendas: funnel.vendas,
@@ -184,7 +191,6 @@ export async function saveFunnel(funnel: FunnelData): Promise<void> {
   if (error) console.error('Error saving funnel:', error);
 }
 
-// Delete all data
 export async function clearAllData(): Promise<void> {
   await supabase.from('meta_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('monthly_targets').delete().neq('id', '00000000-0000-0000-0000-000000000000');
