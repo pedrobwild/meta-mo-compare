@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import { BarChart3, FileText, Activity, GitBranch, Trash2, Lightbulb, Eye, Crosshair, ChartScatter, History, Calculator, Cloud } from 'lucide-react';
+import { Cloud, BarChart3, Zap } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { AppProvider, useAppState } from '@/lib/store';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { AppSidebar, type Tab } from '@/components/AppSidebar';
+import CommandHeader from '@/components/CommandHeader';
 import GlobalFilters from '@/components/GlobalFilters';
 import OverviewCards from '@/components/OverviewCards';
 import HeatmapTable from '@/components/HeatmapTable';
@@ -20,23 +24,57 @@ import AlertsBanner from '@/components/AlertsBanner';
 import BudgetSimulator from '@/components/BudgetSimulator';
 import DecisionLog from '@/components/DecisionLog';
 import MetaSyncButton from '@/components/MetaSyncButton';
-import ThemeToggle from '@/components/ThemeToggle';
 import OnboardingTour from '@/components/OnboardingTour';
-import { Button } from '@/components/ui/button';
 
-type Tab = 'executive' | 'tactical' | 'diagnostic' | 'funnel' | 'report' | 'health' | 'missing' | 'decisions' | 'simulator';
+function EmptyState() {
+  return (
+    <div className="flex-1 flex items-center justify-center">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: 'easeOut' }}
+        className="text-center space-y-8 max-w-lg mx-auto px-4"
+      >
+        <div className="relative">
+          <div className="h-24 w-24 mx-auto rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center glow-primary">
+            <Cloud className="h-12 w-12 text-primary" />
+          </div>
+          <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary/40 animate-pulse" />
+        </div>
+        <div className="space-y-3">
+          <h2 className="text-2xl font-bold text-foreground tracking-tight">
+            Meta Ads <span className="text-gradient-primary">Command Center</span>
+          </h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Conecte seus dados do Meta Ads para desbloquear análises de performance em tempo real, alertas inteligentes e projeções avançadas.
+          </p>
+        </div>
+        <MetaSyncButton />
+        <div className="flex items-center justify-center gap-6 text-[10px] text-muted-foreground/50 uppercase tracking-widest">
+          <span className="flex items-center gap-1.5">
+            <Zap className="h-3 w-3" /> Alertas em tempo real
+          </span>
+          <span className="flex items-center gap-1.5">
+            <BarChart3 className="h-3 w-3" /> Análise profunda
+          </span>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
 
-const TABS: { key: Tab; label: string; icon: React.ReactNode; group?: string }[] = [
-  { key: 'executive', label: 'Executivo', icon: <Eye className="h-4 w-4" />, group: 'análise' },
-  { key: 'tactical', label: 'Tático', icon: <Crosshair className="h-4 w-4" />, group: 'análise' },
-  { key: 'diagnostic', label: 'Diagnóstico', icon: <ChartScatter className="h-4 w-4" />, group: 'análise' },
-  { key: 'funnel', label: 'Funil', icon: <Activity className="h-4 w-4" />, group: 'dados' },
-  { key: 'simulator', label: 'Simulador', icon: <Calculator className="h-4 w-4" />, group: 'dados' },
-  { key: 'report', label: 'Relatório', icon: <FileText className="h-4 w-4" />, group: 'output' },
-  { key: 'decisions', label: 'Decisões', icon: <History className="h-4 w-4" />, group: 'output' },
-  { key: 'health', label: 'Saúde', icon: <GitBranch className="h-4 w-4" />, group: 'config' },
-  { key: 'missing', label: 'Dados', icon: <Lightbulb className="h-4 w-4" />, group: 'config' },
-];
+function ViewContainer({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="space-y-4"
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 function DashboardContent() {
   const { state, dispatch } = useAppState();
@@ -48,129 +86,82 @@ function DashboardContent() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <OnboardingTour />
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-[1800px] mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <BarChart3 className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-sm font-bold text-foreground tracking-tight">Meta Ads Analyzer</h1>
-              <p className="text-[11px] text-muted-foreground hidden sm:block">Dashboard de Performance</p>
-            </div>
-          </div>
+    <SidebarProvider defaultOpen={true}>
+      <div className="min-h-screen flex w-full bg-background">
+        <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-          <nav className="flex items-center gap-0.5 overflow-x-auto scrollbar-none">
-            {TABS.map((tab, i) => {
-              const prevGroup = i > 0 ? TABS[i - 1].group : null;
-              const showSep = prevGroup && prevGroup !== tab.group;
-              return (
-                <div key={tab.key} className="flex items-center">
-                  {showSep && <div className="w-px h-5 bg-border mx-1 hidden sm:block" />}
-                  <button
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap
-                      ${activeTab === tab.key
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-                      }`}
-                  >
-                    {tab.icon}
-                    <span className="hidden md:inline">{tab.label}</span>
-                  </button>
-                </div>
-              );
-            })}
-            <div className="w-px h-5 bg-border mx-1" />
-            <ThemeToggle />
-            {hasData && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-destructive"
-                onClick={() => dispatch({ type: 'CLEAR_ALL' })}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </nav>
+        <div className="flex-1 flex flex-col min-w-0">
+          <CommandHeader />
+
+          <main className="flex-1 p-4 overflow-y-auto">
+            {!hasData && <EmptyState />}
+
+            <AnimatePresence mode="wait">
+              {/* EXECUTIVE VIEW */}
+              {activeTab === 'executive' && hasData && (
+                <ViewContainer key="executive">
+                  <AlertsBanner />
+                  <ExecutiveView />
+                  <PacingCard />
+                </ViewContainer>
+              )}
+
+              {/* TACTICAL VIEW */}
+              {activeTab === 'tactical' && hasData && (
+                <ViewContainer key="tactical">
+                  <AlertsBanner />
+                  <TargetsEditor />
+                  <OverviewCards />
+                  <ActionPanel />
+                  <InsightCards onFilterTable={handleInsightFilter} />
+                  <ComparisonCards />
+                  <HeatmapTable />
+                </ViewContainer>
+              )}
+
+              {/* DIAGNOSTIC VIEW */}
+              {activeTab === 'diagnostic' && hasData && (
+                <ViewContainer key="diagnostic">
+                  <AdvancedCharts />
+                  <OverviewCharts />
+                </ViewContainer>
+              )}
+
+              {/* No data states for analysis tabs */}
+              {(activeTab === 'tactical' || activeTab === 'diagnostic' || activeTab === 'simulator') && !hasData && (
+                <ViewContainer key="nodata">
+                  <div className="text-center py-20 space-y-4">
+                    <BarChart3 className="h-16 w-16 text-muted-foreground/20 mx-auto" />
+                    <p className="text-sm text-muted-foreground">Sincronize dados para acessar esta visualização</p>
+                    <MetaSyncButton />
+                  </div>
+                </ViewContainer>
+              )}
+
+              {activeTab === 'funnel' && (
+                <ViewContainer key="funnel"><FunnelView /></ViewContainer>
+              )}
+              {activeTab === 'simulator' && hasData && (
+                <ViewContainer key="simulator"><BudgetSimulator /></ViewContainer>
+              )}
+              {activeTab === 'report' && (
+                <ViewContainer key="report"><ReportView /></ViewContainer>
+              )}
+              {activeTab === 'decisions' && (
+                <ViewContainer key="decisions"><DecisionLog /></ViewContainer>
+              )}
+              {activeTab === 'health' && (
+                <ViewContainer key="health"><DataHealthView /></ViewContainer>
+              )}
+              {activeTab === 'missing' && (
+                <ViewContainer key="missing"><MissingDataPanel /></ViewContainer>
+              )}
+            </AnimatePresence>
+          </main>
         </div>
-      </header>
-
-      <main className="max-w-[1800px] mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        {/* Empty state: show sync button */}
-        {!hasData && (
-          <div className="text-center py-20 space-y-6">
-            <div className="inline-flex items-center justify-center h-20 w-20 rounded-2xl bg-primary/10">
-              <Cloud className="h-10 w-10 text-primary" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-xl font-semibold text-foreground">Conecte seus dados do Meta Ads</h2>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Sincronize automaticamente os dados da sua conta Meta Ads para começar a análise.
-              </p>
-            </div>
-            <MetaSyncButton />
-          </div>
-        )}
-
-        {/* EXECUTIVE VIEW */}
-        {activeTab === 'executive' && hasData && (
-          <>
-            <GlobalFilters />
-            <AlertsBanner />
-            <ExecutiveView />
-            <PacingCard />
-          </>
-        )}
-
-        {/* TACTICAL VIEW */}
-        {activeTab === 'tactical' && hasData && (
-          <>
-            <GlobalFilters />
-            <AlertsBanner />
-            <TargetsEditor />
-            <OverviewCards />
-            <ActionPanel />
-            <InsightCards onFilterTable={handleInsightFilter} />
-            <ComparisonCards />
-            <HeatmapTable />
-          </>
-        )}
-
-        {/* DIAGNOSTIC VIEW */}
-        {activeTab === 'diagnostic' && hasData && (
-          <>
-            <GlobalFilters />
-            <AdvancedCharts />
-            <OverviewCharts />
-          </>
-        )}
-
-        {/* No data states for analysis tabs */}
-        {(activeTab === 'executive' || activeTab === 'tactical' || activeTab === 'diagnostic' || activeTab === 'simulator') && !hasData && activeTab !== 'executive' && (
-          <div className="text-center py-20 space-y-4">
-            <BarChart3 className="h-16 w-16 text-muted-foreground/30 mx-auto" />
-            <p className="text-muted-foreground">Sincronize dados do Meta Ads para começar</p>
-            <MetaSyncButton />
-          </div>
-        )}
-
-        {activeTab === 'funnel' && <FunnelView />}
-        {activeTab === 'simulator' && hasData && (
-          <>
-            <GlobalFilters />
-            <BudgetSimulator />
-          </>
-        )}
-        {activeTab === 'report' && <ReportView />}
-        {activeTab === 'decisions' && <DecisionLog />}
-        {activeTab === 'health' && <DataHealthView />}
-        {activeTab === 'missing' && <MissingDataPanel />}
-      </main>
-    </div>
+      </div>
+      <OnboardingTour />
+    </SidebarProvider>
   );
 }
 
