@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      decisions_log: {
+        Row: {
+          action_type: string
+          created_at: string
+          id: string
+          item_key: string
+          item_name: string
+          period_key: string
+          reason: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          id?: string
+          item_key: string
+          item_name: string
+          period_key: string
+          reason?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          id?: string
+          item_key?: string
+          item_name?: string
+          period_key?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
       funnel_data: {
         Row: {
           created_at: string

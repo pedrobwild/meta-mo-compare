@@ -11,6 +11,8 @@ import {
   computeFunnel,
   METRIC_DEFS,
 } from '@/lib/calculations';
+import { computeVerdict } from '@/lib/insights/verdicts';
+import { VERTICALS, DEFAULT_VERTICAL, getBenchmarkStatus } from '@/lib/benchmarks';
 import { FileText, Download, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import jsPDF from 'jspdf';
@@ -79,18 +81,26 @@ export default function ReportView() {
     if (cm.lpv_rate < 0.6) recommendations.push('LPV Rate baixo — desalinhamento entre anúncio e landing page');
     if (recommendations.length === 0) recommendations.push('Resultados estáveis — continuar otimizações incrementais');
 
-    return { summary, highlights, recommendations, cm, pm, periodLabel, compLabel, rows };
+    // Verdicts for PDF
+    const verdicts = rows.map(row => ({
+      name: row.name,
+      verdict: computeVerdict(row, cm),
+      spend: row.metrics.spend_brl,
+      results: row.metrics.results,
+      cpa: row.metrics.cost_per_result,
+    }));
+
+    return { summary, highlights, recommendations, cm, pm, periodLabel, compLabel, rows, verdicts };
   }, [state, periodKey, compPeriodKey]);
 
   const exportPDF = () => {
     if (!report || !periodKey) return;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageW = doc.internal.pageSize.getWidth();
     let y = 15;
 
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text('Meta Ads — Relatório', 14, y);
+    doc.text('Meta Ads — Relatório Executivo', 14, y);
     y += 8;
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
@@ -98,7 +108,14 @@ export default function ReportView() {
     doc.text(`${report.periodLabel}${report.compLabel ? ` vs ${report.compLabel}` : ''}`, 14, y);
     y += 10;
 
+    // Summary
     doc.setTextColor(0);
+    doc.setFontSize(10);
+    const summaryLines = doc.splitTextToSize(report.summary, 180);
+    doc.text(summaryLines, 14, y);
+    y += summaryLines.length * 5 + 5;
+
+    // KPIs table
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text('KPIs', 14, y);
@@ -110,17 +127,64 @@ export default function ReportView() {
       const delta = prevVal !== null && prevVal !== 0
         ? `${(((val - prevVal) / Math.abs(prevVal)) * 100).toFixed(1)}%`
         : '—';
-      return [def.label, def.format(val), prevVal !== null ? def.format(prevVal) : '—', delta];
+      const benchmarks = VERTICALS[DEFAULT_VERTICAL];
+      const status = getBenchmarkStatus(def.key, val, benchmarks);
+      const statusEmoji = status === 'good' ? '✅' : status === 'warning' ? '⚠️' : status === 'bad' ? '🔴' : '';
+      return [def.label, def.format(val), prevVal !== null ? def.format(prevVal) : '—', delta, statusEmoji];
     });
 
     autoTable(doc, {
       startY: y,
-      head: [['Métrica', 'Atual', 'Anterior', 'Δ %']],
+      head: [['Métrica', 'Atual', 'Anterior', 'Δ %', 'Status']],
       body: kpiData,
       theme: 'grid',
       headStyles: { fillColor: [30, 144, 255], textColor: 255, fontSize: 9 },
       bodyStyles: { fontSize: 8 },
       margin: { left: 14, right: 14 },
+    });
+
+    y = (doc as any).lastAutoTable.finalY + 8;
+
+    // Semaphores
+    if (report.verdicts.length > 0) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Semáforo por Campanha', 14, y);
+      y += 2;
+
+      const verdictData = report.verdicts.map(v => [
+        `${v.verdict.emoji} ${v.verdict.label}`,
+        v.name,
+        `R$${v.spend.toFixed(2)}`,
+        `${v.results}`,
+        `R$${v.cpa.toFixed(2)}`,
+        `${v.verdict.score}`,
+      ]);
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Veredito', 'Campanha', 'Invest.', 'Result.', 'CPA', 'Score']],
+        body: verdictData,
+        theme: 'grid',
+        headStyles: { fillColor: [30, 144, 255], textColor: 255, fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        margin: { left: 14, right: 14 },
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // Recommendations
+    if (y > 250) { doc.addPage(); y = 15; }
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Recomendações', 14, y);
+    y += 6;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    report.recommendations.forEach((r, i) => {
+      doc.text(`${i + 1}. ${r}`, 14, y);
+      y += 5;
     });
 
     doc.save(`relatorio-meta-ads-${periodKey}.pdf`);
@@ -130,7 +194,7 @@ export default function ReportView() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <FileText className="h-5 w-5 text-primary" />
           Relatório — {report.periodLabel}
@@ -146,7 +210,7 @@ export default function ReportView() {
         <p className="text-foreground leading-relaxed">{report.summary}</p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="glass-card p-5">
           <h3 className="text-sm font-medium text-positive mb-3 flex items-center gap-1.5">
             <CheckCircle2 className="h-4 w-4" /> Destaques Positivos
@@ -179,6 +243,23 @@ export default function ReportView() {
           </ul>
         </div>
       </div>
+
+      {/* Semaphores in report */}
+      {report.verdicts.length > 0 && (
+        <div className="glass-card p-5">
+          <h3 className="text-sm font-medium text-foreground mb-3 uppercase tracking-wider">Semáforo por Campanha</h3>
+          <div className="space-y-2">
+            {report.verdicts.map(v => (
+              <div key={v.name} className="flex items-center gap-3 p-2 rounded-md bg-secondary/30">
+                <span className="text-sm">{v.verdict.emoji}</span>
+                <span className="text-xs font-medium text-foreground flex-1 truncate">{v.name}</span>
+                <span className={`text-xs font-medium ${v.verdict.color}`}>{v.verdict.label}</span>
+                <span className="text-xs text-muted-foreground">Score {v.verdict.score}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="glass-card p-5">
         <h3 className="text-sm font-medium text-primary mb-3 uppercase tracking-wider">Recomendações</h3>
