@@ -12,10 +12,29 @@ import {
 } from '@/lib/calculations';
 import { computeVerdict } from '@/lib/insights/verdicts';
 import { VERTICALS, DEFAULT_VERTICAL, getBenchmarkStatus } from '@/lib/benchmarks';
-import { FileText, Download, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { explainChange } from '@/lib/metrics/explain';
+import { aggregateInsights, type InsightRow } from '@/lib/metrics/aggregate';
+import { generateRecommendations } from '@/lib/alerts/engine';
+import { FileText, Download, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, ArrowDown, ArrowUp, Minus, Lightbulb, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import type { MetaRecord } from '@/lib/types';
+
+function toInsightRow(records: MetaRecord[]): InsightRow[] {
+  return records.map(r => ({
+    spend: r.spend_brl,
+    impressions: r.impressions,
+    reach: r.reach,
+    clicks: r.clicks_all,
+    inline_link_clicks: r.link_clicks,
+    landing_page_views: r.landing_page_views,
+    results_leads: r.results,
+    purchases: 0,
+    purchase_value: 0,
+  }));
+}
 
 export default function ReportView() {
   const { state } = useAppState();
@@ -27,6 +46,22 @@ export default function ReportView() {
     const cm = aggregateMetrics(current);
     const pm = previous.length > 0 ? aggregateMetrics(previous) : null;
     const rows = groupByLevel(current, previous, 'campaign', '', false);
+
+    // ─── Metrics Layer aggregation for explain ───
+    const currentAgg = aggregateInsights(toInsightRow(current));
+    const previousAgg = previous.length > 0 ? aggregateInsights(toInsightRow(previous)) : null;
+
+    // ─── "O que mudou" — Explain key metrics ───
+    const keyMetrics = ['cpa_lead', 'cpc_link', 'roas', 'cpm'];
+    const explanations = previousAgg
+      ? keyMetrics
+          .map(m => explainChange(m, currentAgg, previousAgg!))
+          .filter(e => Math.abs(e.changePercent) > 2)
+          .sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))
+      : [];
+
+    // ─── "O que faremos" — Auto-generated action plan ───
+    const autoRecs = generateRecommendations(currentAgg, previousAgg);
 
     const highlights: { positive: string[]; negative: string[] } = { positive: [], negative: [] };
     const metricChecks = [
@@ -84,7 +119,7 @@ export default function ReportView() {
       cpa: row.metrics.cost_per_result,
     }));
 
-    return { summary, highlights, recommendations, cm, pm, periodLabel, compLabel, rows, verdicts };
+    return { summary, highlights, recommendations, cm, pm, periodLabel, compLabel, rows, verdicts, explanations, autoRecs };
   }, [current, previous, state]);
 
   const exportPDF = () => {
@@ -107,6 +142,45 @@ export default function ReportView() {
     const summaryLines = doc.splitTextToSize(report.summary, 180);
     doc.text(summaryLines, 14, y);
     y += summaryLines.length * 5 + 5;
+
+    // ─── "O que mudou" section in PDF ───
+    if (report.explanations.length > 0) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('O que mudou', 14, y);
+      y += 6;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      report.explanations.forEach(exp => {
+        const lines = doc.splitTextToSize(exp.narrative, 180);
+        doc.text(lines, 14, y);
+        y += lines.length * 4 + 3;
+      });
+      y += 3;
+    }
+
+    // ─── "O que faremos" section in PDF ───
+    if (report.autoRecs.length > 0) {
+      if (y > 250) { doc.addPage(); y = 15; }
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('O que faremos', 14, y);
+      y += 6;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      report.autoRecs.forEach((rec, i) => {
+        const title = `${i + 1}. ${rec.title}`;
+        doc.text(title, 14, y);
+        y += 4;
+        const whyLines = doc.splitTextToSize(`  Por quê: ${rec.why}`, 175);
+        doc.text(whyLines, 14, y);
+        y += whyLines.length * 4;
+        const whatLines = doc.splitTextToSize(`  Ação: ${rec.what_to_do}`, 175);
+        doc.text(whatLines, 14, y);
+        y += whatLines.length * 4 + 2;
+      });
+      y += 3;
+    }
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
@@ -138,6 +212,7 @@ export default function ReportView() {
     y = (doc as any).lastAutoTable.finalY + 8;
 
     if (report.verdicts.length > 0) {
+      if (y > 230) { doc.addPage(); y = 15; }
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('Semáforo por Campanha', 14, y);
@@ -195,11 +270,55 @@ export default function ReportView() {
         </Button>
       </div>
 
+      {/* Resumo Executivo */}
       <div className="glass-card p-5">
         <h3 className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wider">Resumo Executivo</h3>
         <p className="text-foreground leading-relaxed">{report.summary}</p>
       </div>
 
+      {/* ─── O QUE MUDOU ─── */}
+      {report.explanations.length > 0 && (
+        <div className="glass-card p-5 border-l-2 border-l-primary/50">
+          <h3 className="text-sm font-medium text-primary mb-4 uppercase tracking-wider flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" /> O que mudou
+          </h3>
+          <div className="space-y-4">
+            {report.explanations.map((exp, idx) => (
+              <div key={idx} className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-foreground">{exp.targetLabel}</span>
+                  <Badge variant="outline" className={`text-[10px] ${exp.changePercent > 0 ? 'text-emerald-400 border-emerald-500/30' : 'text-red-400 border-red-500/30'}`}>
+                    {exp.changePercent > 0 ? '+' : ''}{exp.changePercent.toFixed(1)}%
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">{exp.narrative}</p>
+                {/* Driver waterfall */}
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {exp.drivers.slice(0, 4).map(d => (
+                    <div key={d.key} className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/20 border border-border/20 text-xs">
+                      {d.impact === 'positive' ? <ArrowUp className="h-3 w-3 text-emerald-400" /> :
+                       d.impact === 'negative' ? <ArrowDown className="h-3 w-3 text-red-400" /> :
+                       <Minus className="h-3 w-3 text-muted-foreground" />}
+                      <span className="font-medium">{d.label}</span>
+                      <span className={`font-mono ${d.percentChange > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {d.percentChange > 0 ? '+' : ''}{d.percentChange.toFixed(1)}%
+                      </span>
+                      <div className="w-10 h-1 bg-muted/30 rounded-full overflow-hidden ml-1">
+                        <div
+                          className={`h-full rounded-full ${d.impact === 'positive' ? 'bg-emerald-400' : d.impact === 'negative' ? 'bg-red-400' : 'bg-muted-foreground'}`}
+                          style={{ width: `${Math.min(d.contribution * 100, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Destaques / Atenção */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="glass-card p-5">
           <h3 className="text-sm font-medium text-positive mb-3 flex items-center gap-1.5">
@@ -234,6 +353,32 @@ export default function ReportView() {
         </div>
       </div>
 
+      {/* ─── O QUE FAREMOS ─── */}
+      {report.autoRecs.length > 0 && (
+        <div className="glass-card p-5 border-l-2 border-l-amber-500/50">
+          <h3 className="text-sm font-medium text-amber-400 mb-4 uppercase tracking-wider flex items-center gap-2">
+            <Lightbulb className="h-4 w-4" /> O que faremos
+          </h3>
+          <div className="space-y-4">
+            {report.autoRecs.map((rec, i) => (
+              <div key={i} className="p-3 rounded-lg bg-muted/10 border border-border/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-foreground">{rec.title}</span>
+                  <Badge variant="outline" className="text-[10px]">
+                    Confiança {Math.round(rec.confidence * 100)}%
+                  </Badge>
+                </div>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p><span className="font-medium text-foreground/70">Por quê:</span> {rec.why}</p>
+                  <p><span className="font-medium text-foreground/70">Ação:</span> {rec.what_to_do}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Semáforo */}
       {report.verdicts.length > 0 && (
         <div className="glass-card p-5">
           <h3 className="text-sm font-medium text-foreground mb-3 uppercase tracking-wider">Semáforo por Campanha</h3>
@@ -250,6 +395,7 @@ export default function ReportView() {
         </div>
       )}
 
+      {/* Recomendações legadas */}
       <div className="glass-card p-5">
         <h3 className="text-sm font-medium text-primary mb-3 uppercase tracking-wider">Recomendações</h3>
         <ul className="space-y-2">
