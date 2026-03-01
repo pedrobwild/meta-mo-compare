@@ -19,6 +19,7 @@ import DataHealthView from '@/components/DataHealthView';
 import TargetsEditor from '@/components/TargetsEditor';
 import InsightCards from '@/components/InsightCards';
 import ComparisonCards from '@/components/ComparisonCards';
+import AdComparisonSelector from '@/components/AdComparisonSelector';
 import ActionPanel from '@/components/ActionPanel';
 import ExecutiveView from '@/components/ExecutiveView';
 import MissingDataPanel from '@/components/MissingDataPanel';
@@ -135,6 +136,7 @@ function DashboardContent() {
                 <ViewContainer key="executive">
                   <AlertsBanner />
                   <ExecutiveView />
+                  <AdComparisonSelector />
                   <PacingCard />
                 </ViewContainer>
               )}
@@ -147,6 +149,7 @@ function DashboardContent() {
                   <ActionCenter />
                   <ActionPanel />
                   <InsightCards onFilterTable={handleInsightFilter} />
+                  <AdComparisonSelector />
                   <ComparisonCards />
                   <HeatmapTable />
                 </ViewContainer>
