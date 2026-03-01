@@ -55,6 +55,186 @@ export type Database = {
           },
         ]
       }
+      alert_events: {
+        Row: {
+          context_json: Json | null
+          id: string
+          resolved_at: string | null
+          rule_id: string | null
+          status: string
+          triggered_at: string
+          workspace_id: string
+        }
+        Insert: {
+          context_json?: Json | null
+          id?: string
+          resolved_at?: string | null
+          rule_id?: string | null
+          status?: string
+          triggered_at?: string
+          workspace_id: string
+        }
+        Update: {
+          context_json?: Json | null
+          id?: string
+          resolved_at?: string | null
+          rule_id?: string | null
+          status?: string
+          triggered_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_events_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "alert_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alert_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alert_rules: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          filters_json: Json | null
+          id: string
+          metric: string
+          min_spend: number | null
+          name: string
+          notification_channels_json: Json | null
+          operator: string
+          scope: string
+          severity: string
+          threshold: number
+          window_days: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          filters_json?: Json | null
+          id?: string
+          metric: string
+          min_spend?: number | null
+          name: string
+          notification_channels_json?: Json | null
+          operator?: string
+          scope?: string
+          severity?: string
+          threshold: number
+          window_days?: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          filters_json?: Json | null
+          id?: string
+          metric?: string
+          min_spend?: number | null
+          name?: string
+          notification_channels_json?: Json | null
+          operator?: string
+          scope?: string
+          severity?: string
+          threshold?: number
+          window_days?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_rules_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      annotations: {
+        Row: {
+          author_user_id: string | null
+          created_at: string
+          date: string | null
+          entity_ref: string | null
+          id: string
+          note: string
+          tags_json: Json | null
+          workspace_id: string
+        }
+        Insert: {
+          author_user_id?: string | null
+          created_at?: string
+          date?: string | null
+          entity_ref?: string | null
+          id?: string
+          note: string
+          tags_json?: Json | null
+          workspace_id: string
+        }
+        Update: {
+          author_user_id?: string | null
+          created_at?: string
+          date?: string | null
+          entity_ref?: string | null
+          id?: string
+          note?: string
+          tags_json?: Json | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "annotations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          payload_json: Json | null
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          payload_json?: Json | null
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          payload_json?: Json | null
+          user_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       connectors: {
         Row: {
           config_json: Json | null
@@ -125,6 +305,50 @@ export type Database = {
           reason?: string | null
         }
         Relationships: []
+      }
+      facts_funnel_daily: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          mql: number
+          receita: number
+          source: string | null
+          sql_count: number
+          vendas: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          mql?: number
+          receita?: number
+          source?: string | null
+          sql_count?: number
+          vendas?: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          mql?: number
+          receita?: number
+          source?: string | null
+          sql_count?: number
+          vendas?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facts_funnel_daily_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       funnel_data: {
         Row: {
@@ -558,6 +782,72 @@ export type Database = {
         }
         Relationships: []
       }
+      recommendations: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          entity_id: string | null
+          entity_level: string | null
+          evidence_json: Json | null
+          expected_impact_json: Json | null
+          id: string
+          priority: number
+          related_alert_event_id: string | null
+          status: string
+          title: string
+          what_to_do: string | null
+          why: string | null
+          workspace_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          entity_id?: string | null
+          entity_level?: string | null
+          evidence_json?: Json | null
+          expected_impact_json?: Json | null
+          id?: string
+          priority?: number
+          related_alert_event_id?: string | null
+          status?: string
+          title: string
+          what_to_do?: string | null
+          why?: string | null
+          workspace_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          entity_id?: string | null
+          entity_level?: string | null
+          evidence_json?: Json | null
+          expected_impact_json?: Json | null
+          id?: string
+          priority?: number
+          related_alert_event_id?: string | null
+          status?: string
+          title?: string
+          what_to_do?: string | null
+          why?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recommendations_related_alert_event_id_fkey"
+            columns: ["related_alert_event_id"]
+            isOneToOne: false
+            referencedRelation: "alert_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recommendations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sync_runs: {
         Row: {
           ad_account_id: string | null
@@ -608,6 +898,59 @@ export type Database = {
           },
           {
             foreignKeyName: "sync_runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      targets_monthly: {
+        Row: {
+          cpa_target: number | null
+          cpm_target: number | null
+          created_at: string
+          ctr_target: number | null
+          id: string
+          leads: number | null
+          month_key: string
+          receita: number | null
+          roas_target: number | null
+          spend: number | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          cpa_target?: number | null
+          cpm_target?: number | null
+          created_at?: string
+          ctr_target?: number | null
+          id?: string
+          leads?: number | null
+          month_key: string
+          receita?: number | null
+          roas_target?: number | null
+          spend?: number | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          cpa_target?: number | null
+          cpm_target?: number | null
+          created_at?: string
+          ctr_target?: number | null
+          id?: string
+          leads?: number | null
+          month_key?: string
+          receita?: number | null
+          roas_target?: number | null
+          spend?: number | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "targets_monthly_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
