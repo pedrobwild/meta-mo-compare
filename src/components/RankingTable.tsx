@@ -158,9 +158,20 @@ export default function RankingTable() {
               )}
               {depth > 0 && !showExpander && <span className="w-3.5 flex-shrink-0" />}
               <div className="min-w-0">
-                <p className={`truncate ${depth === 0 ? 'text-foreground font-medium' : 'text-muted-foreground text-xs'}`}>
-                  {row.name}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className={`truncate ${depth === 0 ? 'text-foreground font-medium' : 'text-muted-foreground text-xs'}`}>
+                    {row.name}
+                  </p>
+                  {depth === 0 && (
+                    <span className={`inline-flex items-center rounded-full px-1.5 py-0 text-[10px] font-medium flex-shrink-0 ${
+                      row.status === 'active'
+                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-muted text-muted-foreground'
+                    }`}>
+                      {row.status === 'active' ? 'Ativo' : 'Inativo'}
+                    </span>
+                  )}
+                </div>
                 {badges.length > 0 && (
                   <div className="flex gap-1 mt-0.5">
                     {badges.map(b => (
@@ -213,6 +224,13 @@ export default function RankingTable() {
             <div className="flex items-center gap-1" style={{ paddingLeft: `${indent}px` }}>
               <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
               <p className="text-muted-foreground text-xs truncate">{row.name}</p>
+              <span className={`inline-flex items-center rounded-full px-1.5 py-0 text-[10px] font-medium flex-shrink-0 ${
+                row.status === 'active'
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {row.status === 'active' ? 'Ativo' : 'Inativo'}
+              </span>
             </div>
           </td>
           {columns.map(col => (
