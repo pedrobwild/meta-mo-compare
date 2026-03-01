@@ -155,68 +155,89 @@ function DecisionMatrix2x2({
     return { name: row.name, key: row.key, ctr, yVal };
   });
 
-  const quadrants = [
-    { label: '★ Escalar', desc: 'Alto CTR + Alta Conversão', class: 'bg-positive/8 border-positive/20', x: 'right', y: 'top' },
-    { label: '⚙ Otimizar Funil', desc: 'Alto CTR + Baixa Conversão', class: 'bg-warning/8 border-warning/20', x: 'right', y: 'bottom' },
-    { label: '🎯 Melhorar Criativo', desc: 'Baixo CTR + Alta Conversão', class: 'bg-primary/8 border-primary/20', x: 'left', y: 'top' },
-    { label: '⛔ Reavaliar', desc: 'Baixo CTR + Baixa Conversão', class: 'bg-destructive/8 border-destructive/20', x: 'left', y: 'bottom' },
-  ];
+  const quadrants = {
+    topLeft:  { label: '🔶 Revisar Criativo', desc: 'O lead qualificado chega, mas o anúncio não ganha o feed. Teste novos hooks e formatos. Não mexa no público.', class: 'bg-warning/8 border-warning/20' },
+    topRight: { label: '🟢 Escalar', desc: 'Criativo atrai, público tem intenção. Aumente budget 20-30%/semana monitorando frequência.', class: 'bg-positive/8 border-positive/20' },
+    botLeft:  { label: '🔴 Pausar', desc: 'Problema duplo: criativo fraco e público errado. Pausar e repensar antes de reinvestir.', class: 'bg-destructive/8 border-destructive/20' },
+    botRight: { label: '🔵 Revisar Público', desc: 'Criativo performa bem, mas público não tem intenção real. Adicione qualificadores na segmentação.', class: 'bg-primary/8 border-primary/20' },
+  };
 
   return (
     <div className="glass-panel p-4 space-y-3">
       <div>
         <h3 className="text-xs font-semibold text-foreground">Matriz de Decisão</h3>
         <p className="text-[10px] text-muted-foreground">CTR Link × {yLabel} — limiares: {ctrThreshold}% / {(yThreshold * 100).toFixed(0)}%</p>
+        {!hasLeadData && (
+          <p className="text-[10px] text-warning mt-1 flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" />
+            Usando LPV Rate como proxy — importe dados de qualidade para precisão real.
+          </p>
+        )}
       </div>
 
-      <div className="grid grid-cols-2 gap-px bg-border/30 rounded-lg overflow-hidden">
-        {/* Top-Left: Low CTR + High Y */}
-        <div className={`p-3 space-y-1 ${quadrants[2].class}`}>
-          <p className="text-[10px] font-bold text-foreground">{quadrants[2].label}</p>
-          <p className="text-[9px] text-muted-foreground">{quadrants[2].desc}</p>
+      {/* Header row */}
+      <div className="grid grid-cols-[100px_1fr_1fr] gap-px text-[10px] font-bold text-muted-foreground">
+        <div />
+        <div className="text-center p-1">CTR baixo (&lt;{ctrThreshold}%)</div>
+        <div className="text-center p-1">CTR alto (≥{ctrThreshold}%)</div>
+      </div>
+
+      {/* Top row: High Y */}
+      <div className="grid grid-cols-[100px_1fr_1fr] gap-px">
+        <div className="flex items-center text-[10px] font-bold text-muted-foreground pr-2 text-right leading-tight">
+          {yLabel} alto (≥{(yThreshold * 100).toFixed(0)}%)
+        </div>
+        {/* Top-Left: Low CTR + High Y → Revisar Criativo */}
+        <div className={`p-3 rounded-tl-lg space-y-1 ${quadrants.topLeft.class}`}>
+          <p className="text-[10px] font-bold text-foreground">{quadrants.topLeft.label}</p>
+          <p className="text-[9px] text-muted-foreground leading-snug">{quadrants.topLeft.desc}</p>
           <div className="space-y-0.5 mt-1">
             {points.filter(p => p.ctr < ctrThreshold && p.yVal >= yThreshold).map(p => (
               <p key={p.key} className="text-[10px] font-mono text-foreground truncate" title={p.name}>
-                {p.name.slice(0, 25)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {(p.yVal * 100).toFixed(0)}%)</span>
+                • {p.name.slice(0, 22)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {(p.yVal * 100).toFixed(0)}%)</span>
               </p>
             ))}
           </div>
         </div>
-
-        {/* Top-Right: High CTR + High Y */}
-        <div className={`p-3 space-y-1 ${quadrants[0].class}`}>
-          <p className="text-[10px] font-bold text-foreground">{quadrants[0].label}</p>
-          <p className="text-[9px] text-muted-foreground">{quadrants[0].desc}</p>
+        {/* Top-Right: High CTR + High Y → Escalar */}
+        <div className={`p-3 rounded-tr-lg space-y-1 ${quadrants.topRight.class}`}>
+          <p className="text-[10px] font-bold text-foreground">{quadrants.topRight.label}</p>
+          <p className="text-[9px] text-muted-foreground leading-snug">{quadrants.topRight.desc}</p>
           <div className="space-y-0.5 mt-1">
             {points.filter(p => p.ctr >= ctrThreshold && p.yVal >= yThreshold).map(p => (
               <p key={p.key} className="text-[10px] font-mono text-foreground truncate" title={p.name}>
-                {p.name.slice(0, 25)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {(p.yVal * 100).toFixed(0)}%)</span>
+                • {p.name.slice(0, 22)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {(p.yVal * 100).toFixed(0)}%)</span>
               </p>
             ))}
           </div>
         </div>
+      </div>
 
-        {/* Bottom-Left: Low CTR + Low Y */}
-        <div className={`p-3 space-y-1 ${quadrants[3].class}`}>
-          <p className="text-[10px] font-bold text-foreground">{quadrants[3].label}</p>
-          <p className="text-[9px] text-muted-foreground">{quadrants[3].desc}</p>
+      {/* Bottom row: Low Y */}
+      <div className="grid grid-cols-[100px_1fr_1fr] gap-px">
+        <div className="flex items-center text-[10px] font-bold text-muted-foreground pr-2 text-right leading-tight">
+          {yLabel} baixo (&lt;{(yThreshold * 100).toFixed(0)}%)
+        </div>
+        {/* Bottom-Left: Low CTR + Low Y → Pausar */}
+        <div className={`p-3 rounded-bl-lg space-y-1 ${quadrants.botLeft.class}`}>
+          <p className="text-[10px] font-bold text-foreground">{quadrants.botLeft.label}</p>
+          <p className="text-[9px] text-muted-foreground leading-snug">{quadrants.botLeft.desc}</p>
           <div className="space-y-0.5 mt-1">
             {points.filter(p => p.ctr < ctrThreshold && p.yVal < yThreshold).map(p => (
               <p key={p.key} className="text-[10px] font-mono text-foreground truncate" title={p.name}>
-                {p.name.slice(0, 25)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {(p.yVal * 100).toFixed(0)}%)</span>
+                • {p.name.slice(0, 22)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {(p.yVal * 100).toFixed(0)}%)</span>
               </p>
             ))}
           </div>
         </div>
-
-        {/* Bottom-Right: High CTR + Low Y */}
-        <div className={`p-3 space-y-1 ${quadrants[1].class}`}>
-          <p className="text-[10px] font-bold text-foreground">{quadrants[1].label}</p>
-          <p className="text-[9px] text-muted-foreground">{quadrants[1].desc}</p>
+        {/* Bottom-Right: High CTR + Low Y → Revisar Público */}
+        <div className={`p-3 rounded-br-lg space-y-1 ${quadrants.botRight.class}`}>
+          <p className="text-[10px] font-bold text-foreground">{quadrants.botRight.label}</p>
+          <p className="text-[9px] text-muted-foreground leading-snug">{quadrants.botRight.desc}</p>
           <div className="space-y-0.5 mt-1">
             {points.filter(p => p.ctr >= ctrThreshold && p.yVal < yThreshold).map(p => (
               <p key={p.key} className="text-[10px] font-mono text-foreground truncate" title={p.name}>
-                {p.name.slice(0, 25)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {(p.yVal * 100).toFixed(0)}%)</span>
+                • {p.name.slice(0, 22)} <span className="text-muted-foreground">({p.ctr.toFixed(1)}% / {(p.yVal * 100).toFixed(0)}%)</span>
               </p>
             ))}
           </div>
