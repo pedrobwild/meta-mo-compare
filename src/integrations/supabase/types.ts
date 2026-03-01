@@ -276,6 +276,74 @@ export type Database = {
           },
         ]
       }
+      creative_lifecycle: {
+        Row: {
+          activated_at: string | null
+          ad_key: string
+          ad_name: string
+          adset_key: string | null
+          campaign_key: string | null
+          created_at: string | null
+          current_ctr: number | null
+          days_active: number | null
+          degradation_pct: number | null
+          format: string | null
+          hook_type: string | null
+          id: string
+          peak_ctr: number | null
+          peak_ctr_date: string | null
+          status: string | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          activated_at?: string | null
+          ad_key: string
+          ad_name: string
+          adset_key?: string | null
+          campaign_key?: string | null
+          created_at?: string | null
+          current_ctr?: number | null
+          days_active?: number | null
+          degradation_pct?: number | null
+          format?: string | null
+          hook_type?: string | null
+          id?: string
+          peak_ctr?: number | null
+          peak_ctr_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          activated_at?: string | null
+          ad_key?: string
+          ad_name?: string
+          adset_key?: string | null
+          campaign_key?: string | null
+          created_at?: string | null
+          current_ctr?: number | null
+          days_active?: number | null
+          degradation_pct?: number | null
+          format?: string | null
+          hook_type?: string | null
+          id?: string
+          peak_ctr?: number | null
+          peak_ctr_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_lifecycle_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       decisions_log: {
         Row: {
           action_type: string
@@ -533,6 +601,71 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "funnel_data_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_quality: {
+        Row: {
+          ad_key: string | null
+          adset_key: string | null
+          campaign_key: string
+          contratos_fechados: number | null
+          created_at: string | null
+          date: string
+          id: string
+          leads_atendidos: number | null
+          leads_qualificados: number | null
+          leads_total: number | null
+          notes: string | null
+          propostas_enviadas: number | null
+          receita_brl: number | null
+          updated_at: string | null
+          visitas_agendadas: number | null
+          workspace_id: string
+        }
+        Insert: {
+          ad_key?: string | null
+          adset_key?: string | null
+          campaign_key: string
+          contratos_fechados?: number | null
+          created_at?: string | null
+          date: string
+          id?: string
+          leads_atendidos?: number | null
+          leads_qualificados?: number | null
+          leads_total?: number | null
+          notes?: string | null
+          propostas_enviadas?: number | null
+          receita_brl?: number | null
+          updated_at?: string | null
+          visitas_agendadas?: number | null
+          workspace_id: string
+        }
+        Update: {
+          ad_key?: string | null
+          adset_key?: string | null
+          campaign_key?: string
+          contratos_fechados?: number | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          leads_atendidos?: number | null
+          leads_qualificados?: number | null
+          leads_total?: number | null
+          notes?: string | null
+          propostas_enviadas?: number | null
+          receita_brl?: number | null
+          updated_at?: string | null
+          visitas_agendadas?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_quality_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
