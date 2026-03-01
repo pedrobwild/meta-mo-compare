@@ -22,10 +22,10 @@
     --primary-glow: 190 100% 60%;
 
     --secondary: 228 10% 12%;
-    --secondary-foreground: 210 20% 80%;
+    --secondary-foreground: 210 20% 88%;
 
     --muted: 228 10% 10%;
-    --muted-foreground: 220 10% 45%;
+    --muted-foreground: 220 10% 58%;
 
     --accent: 152 80% 48%;
     --accent-foreground: 228 14% 5%;
@@ -54,11 +54,11 @@
     --negative-foreground: 0 85% 12%;
 
     --sidebar-background: 228 14% 4%;
-    --sidebar-foreground: 210 20% 70%;
+    --sidebar-foreground: 210 20% 80%;
     --sidebar-primary: 190 100% 50%;
     --sidebar-primary-foreground: 228 14% 5%;
     --sidebar-accent: 228 10% 10%;
-    --sidebar-accent-foreground: 210 20% 85%;
+    --sidebar-accent-foreground: 210 20% 92%;
     --sidebar-border: 228 10% 12%;
     --sidebar-ring: 190 100% 50%;
 
