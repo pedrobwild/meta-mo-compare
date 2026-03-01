@@ -285,6 +285,7 @@ export type Database = {
           item_name: string
           period_key: string
           reason: string | null
+          workspace_id: string | null
         }
         Insert: {
           action_type: string
@@ -294,6 +295,7 @@ export type Database = {
           item_name: string
           period_key: string
           reason?: string | null
+          workspace_id?: string | null
         }
         Update: {
           action_type?: string
@@ -303,8 +305,17 @@ export type Database = {
           item_name?: string
           period_key?: string
           reason?: string | null
+          workspace_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "decisions_log_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       facts_funnel_daily: {
         Row: {
@@ -362,6 +373,7 @@ export type Database = {
           sql_count: number
           updated_at: string
           vendas: number
+          workspace_id: string | null
         }
         Insert: {
           created_at?: string
@@ -374,6 +386,7 @@ export type Database = {
           sql_count?: number
           updated_at?: string
           vendas?: number
+          workspace_id?: string | null
         }
         Update: {
           created_at?: string
@@ -386,8 +399,17 @@ export type Database = {
           sql_count?: number
           updated_at?: string
           vendas?: number
+          workspace_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "funnel_data_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       meta_ads: {
         Row: {
@@ -639,6 +661,7 @@ export type Database = {
           source_type: string
           spend_brl: number
           unique_key: string
+          workspace_id: string | null
         }
         Insert: {
           ad_key: string
@@ -676,6 +699,7 @@ export type Database = {
           source_type?: string
           spend_brl?: number
           unique_key: string
+          workspace_id?: string | null
         }
         Update: {
           ad_key?: string
@@ -713,8 +737,17 @@ export type Database = {
           source_type?: string
           spend_brl?: number
           unique_key?: string
+          workspace_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "meta_records_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       monthly_targets: {
         Row: {
@@ -737,6 +770,7 @@ export type Database = {
           sql_target: number | null
           updated_at: string
           vendas: number | null
+          workspace_id: string | null
         }
         Insert: {
           cost_per_lpv?: number | null
@@ -758,6 +792,7 @@ export type Database = {
           sql_target?: number | null
           updated_at?: string
           vendas?: number | null
+          workspace_id?: string | null
         }
         Update: {
           cost_per_lpv?: number | null
@@ -779,8 +814,17 @@ export type Database = {
           sql_target?: number | null
           updated_at?: string
           vendas?: number | null
+          workspace_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "monthly_targets_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       recommendations: {
         Row: {
