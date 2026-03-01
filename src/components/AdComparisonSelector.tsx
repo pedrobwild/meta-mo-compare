@@ -277,12 +277,9 @@ export default function AdComparisonSelector() {
                     idx % 2 === 0 ? 'bg-surface-1/20' : 'bg-transparent'
                   } ${idx < KPI_DEFS.length - 1 ? 'border-b border-border/20' : ''}`}
                 >
-                  {/* Metric label */}
                   <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {kpi.label}
                   </div>
-
-                  {/* Value A */}
                   <div className="text-right flex items-center justify-end gap-1.5">
                     <span className={`text-sm font-bold font-mono ${
                       aWins ? 'text-primary' : bWins ? 'text-muted-foreground' : 'text-foreground'
@@ -291,8 +288,6 @@ export default function AdComparisonSelector() {
                     </span>
                     {aWins && <Trophy className="h-3 w-3 text-warning flex-shrink-0" />}
                   </div>
-
-                  {/* Delta */}
                   <div className="text-center">
                     {!equal && absDiff > 0.1 ? (
                       <span className={`text-[10px] font-mono font-semibold ${
@@ -304,8 +299,6 @@ export default function AdComparisonSelector() {
                       <span className="text-[10px] text-muted-foreground/30">—</span>
                     )}
                   </div>
-
-                  {/* Value B */}
                   <div className="text-right flex items-center justify-end gap-1.5">
                     <span className={`text-sm font-bold font-mono ${
                       bWins ? 'text-accent' : aWins ? 'text-muted-foreground' : 'text-foreground'
@@ -318,8 +311,126 @@ export default function AdComparisonSelector() {
               );
             })}
           </div>
+
+          {/* Auto Summary */}
+          <ComparisonSummary rowA={rowA} rowB={rowB} winsA={winsA} winsB={winsB} kpiDefs={KPI_DEFS} />
         </div>
       )}
     </div>
   );
+}
+
+/* ─── Textual Summary Sub-component ─── */
+function ComparisonSummary({ rowA, rowB, winsA, winsB, kpiDefs }: {
+  rowA: GroupedRow; rowB: GroupedRow; winsA: number; winsB: number; kpiDefs: KpiDef[];
+}) {
+  const summary = useMemo(() => {
+    const ma = rowA.metrics;
+    const mb = rowB.metrics;
+    const nameA = rowA.name;
+    const nameB = rowB.name;
+
+    const strengthsA: string[] = [];
+    const strengthsB: string[] = [];
+
+    for (const kpi of kpiDefs) {
+      const va = ma[kpi.key];
+      const vb = mb[kpi.key];
+      if (va === vb || (va === 0 && vb === 0)) continue;
+      const aWins = kpi.lowerIsBetter ? va < vb : va > vb;
+      const diffPct = vb !== 0 ? Math.abs(((va - vb) / Math.abs(vb)) * 100) : 100;
+      if (diffPct < 5) continue; // ignore negligible differences
+
+      const magnitude = diffPct >= 50 ? 'muito melhor' : diffPct >= 20 ? 'melhor' : 'levemente melhor';
+      const entry = `${kpi.label} ${magnitude} (${diffPct.toFixed(0)}%)`;
+
+      if (aWins) strengthsA.push(entry);
+      else strengthsB.push(entry);
+    }
+
+    // Determine verdict
+    let verdict = '';
+    if (winsA > winsB) {
+      verdict = `**${nameA}** é o vencedor geral com ${winsA} vitórias contra ${winsB}.`;
+    } else if (winsB > winsA) {
+      verdict = `**${nameB}** é o vencedor geral com ${winsB} vitórias contra ${winsA}.`;
+    } else {
+      verdict = `Empate técnico — ambos vencem em ${winsA} métricas cada.`;
+    }
+
+    // Funnel diagnosis
+    let diagnosis = '';
+    const aCtrBetter = ma.ctr_link > mb.ctr_link;
+    const aCpaBetter = ma.cost_per_result > 0 && mb.cost_per_result > 0 && ma.cost_per_result < mb.cost_per_result;
+    const aLpvBetter = ma.lpv_rate > mb.lpv_rate;
+
+    if (aCtrBetter && !aCpaBetter) {
+      diagnosis = `⚡ **${nameA}** tem CTR superior mas CPA pior — o gancho atrai cliques, mas a conversão pós-clique (LP ou oferta) precisa de ajuste.`;
+    } else if (!aCtrBetter && aCpaBetter) {
+      diagnosis = `⚡ **${nameB}** tem CTR superior mas CPA pior — considere testar o criativo de **${nameB}** com a landing page de **${nameA}**.`;
+    }
+
+    if (!diagnosis && ma.frequency > 0 && mb.frequency > 0) {
+      const freqDiff = Math.abs(ma.frequency - mb.frequency);
+      if (freqDiff > 0.5) {
+        const highFreq = ma.frequency > mb.frequency ? nameA : nameB;
+        const lowFreq = ma.frequency > mb.frequency ? nameB : nameA;
+        diagnosis = `📊 **${highFreq}** tem frequência mais alta — priorize escalar **${lowFreq}** que tem mais vida útil.`;
+      }
+    }
+
+    // Recommendation
+    let recommendation = '';
+    if (winsA !== winsB) {
+      const winner = winsA > winsB ? nameA : nameB;
+      const loser = winsA > winsB ? nameB : nameA;
+      recommendation = `💡 **Ação sugerida:** Priorizar budget para **${winner}**. Avaliar variações criativas de **${loser}** ou pausar se a tendência se confirmar.`;
+    } else {
+      recommendation = `💡 **Ação sugerida:** Manter ambos ativos e monitorar tendência nos próximos 3-5 dias antes de decidir.`;
+    }
+
+    return { strengthsA, strengthsB, verdict, diagnosis, recommendation, nameA, nameB };
+  }, [rowA, rowB, winsA, winsB, kpiDefs]);
+
+  return (
+    <div className="rounded-lg border border-border/30 bg-surface-2/20 p-4 space-y-3 text-xs leading-relaxed">
+      <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+        📝 Resumo da comparação
+      </h4>
+
+      {/* Verdict */}
+      <p className="text-foreground" dangerouslySetInnerHTML={{ __html: mdBold(summary.verdict) }} />
+
+      {/* Strengths */}
+      {summary.strengthsA.length > 0 && (
+        <div>
+          <span className="font-semibold text-primary">Pontos fortes de {summary.nameA}:</span>
+          <ul className="mt-1 ml-4 list-disc text-muted-foreground space-y-0.5">
+            {summary.strengthsA.map((s, i) => <li key={i}>{s}</li>)}
+          </ul>
+        </div>
+      )}
+      {summary.strengthsB.length > 0 && (
+        <div>
+          <span className="font-semibold text-accent">Pontos fortes de {summary.nameB}:</span>
+          <ul className="mt-1 ml-4 list-disc text-muted-foreground space-y-0.5">
+            {summary.strengthsB.map((s, i) => <li key={i}>{s}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {/* Diagnosis */}
+      {summary.diagnosis && (
+        <p className="text-foreground" dangerouslySetInnerHTML={{ __html: mdBold(summary.diagnosis) }} />
+      )}
+
+      {/* Recommendation */}
+      <p className="text-foreground font-medium" dangerouslySetInnerHTML={{ __html: mdBold(summary.recommendation) }} />
+    </div>
+  );
+}
+
+/** Minimal bold markdown: **text** → <strong>text</strong> */
+function mdBold(s: string) {
+  return s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 }
