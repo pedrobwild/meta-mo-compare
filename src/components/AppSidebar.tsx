@@ -1,5 +1,6 @@
-import { Eye, Crosshair, ChartScatter, Activity, Calculator, FileText, History, GitBranch, Lightbulb, Cloud, RefreshCw, Trash2, BarChart3 } from 'lucide-react';
+import { Eye, Crosshair, ChartScatter, Activity, Calculator, FileText, History, GitBranch, Lightbulb, Cloud, RefreshCw, Trash2, BarChart3, Bell, Zap, LogOut } from 'lucide-react';
 import { useAppState } from '@/lib/store';
+import { useWorkspace } from '@/lib/workspace';
 import MetaSyncButton from './MetaSyncButton';
 import ThemeToggle from './ThemeToggle';
 import {
@@ -18,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
-export type Tab = 'executive' | 'tactical' | 'diagnostic' | 'funnel' | 'simulator' | 'report' | 'decisions' | 'health' | 'missing';
+export type Tab = 'executive' | 'tactical' | 'diagnostic' | 'funnel' | 'simulator' | 'report' | 'decisions' | 'health' | 'missing' | 'alerts' | 'actions';
 
 const NAV_GROUPS = [
   {
@@ -27,6 +28,8 @@ const NAV_GROUPS = [
       { key: 'executive' as Tab, label: 'Executivo', icon: Eye, description: 'Visão geral e semáforos' },
       { key: 'tactical' as Tab, label: 'Tático', icon: Crosshair, description: 'KPIs, insights e ações' },
       { key: 'diagnostic' as Tab, label: 'Diagnóstico', icon: ChartScatter, description: 'Gráficos avançados' },
+      { key: 'alerts' as Tab, label: 'Alertas', icon: Bell, description: 'Regras e eventos' },
+      { key: 'actions' as Tab, label: 'Ações', icon: Zap, description: 'Recomendações' },
     ],
   },
   {
@@ -60,6 +63,7 @@ interface AppSidebarProps {
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { state, dispatch } = useAppState();
   const { state: sidebarState } = useSidebar();
+  const { user, workspace, signOut } = useWorkspace();
   const collapsed = sidebarState === 'collapsed';
   const hasData = state.records.length > 0;
 
@@ -139,11 +143,19 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           )}
         </div>
         {!collapsed && (
-          <div className="px-1 py-1">
+          <div className="px-1 py-1 space-y-1">
+            {workspace && (
+              <div className="text-[10px] text-muted-foreground/70 truncate">{workspace.name}</div>
+            )}
             <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/50">
               <div className="status-dot-live" />
-              <span>Conectado ao Meta Ads</span>
+              <span>Conectado</span>
             </div>
+            {user && (
+              <Button variant="ghost" size="sm" className="h-6 w-full text-[10px] text-muted-foreground justify-start px-1" onClick={signOut}>
+                <LogOut className="h-3 w-3 mr-1" /> Sair
+              </Button>
+            )}
           </div>
         )}
       </SidebarFooter>

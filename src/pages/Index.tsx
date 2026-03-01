@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { Cloud, BarChart3, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppProvider, useAppState } from '@/lib/store';
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { useWorkspace } from '@/lib/workspace';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar, type Tab } from '@/components/AppSidebar';
 import CommandHeader from '@/components/CommandHeader';
-import GlobalFilters from '@/components/GlobalFilters';
 import OverviewCards from '@/components/OverviewCards';
 import HeatmapTable from '@/components/HeatmapTable';
 import OverviewCharts from '@/components/OverviewCharts';
@@ -25,6 +25,9 @@ import BudgetSimulator from '@/components/BudgetSimulator';
 import DecisionLog from '@/components/DecisionLog';
 import MetaSyncButton from '@/components/MetaSyncButton';
 import OnboardingTour from '@/components/OnboardingTour';
+import ActionCenter from '@/components/ActionCenter';
+import AlertsView from '@/components/AlertsView';
+import Auth from '@/pages/Auth';
 
 function EmptyState() {
   return (
@@ -46,7 +49,7 @@ function EmptyState() {
             Meta Ads <span className="text-gradient-primary">Command Center</span>
           </h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Conecte seus dados do Meta Ads para desbloquear análises de performance em tempo real, alertas inteligentes e projeções avançadas.
+            Conecte seus dados do Meta Ads para desbloquear análises de performance, alertas inteligentes e recomendações acionáveis.
           </p>
         </div>
         <MetaSyncButton />
@@ -78,8 +81,22 @@ function ViewContainer({ children }: { children: React.ReactNode }) {
 
 function DashboardContent() {
   const { state, dispatch } = useAppState();
+  const { user, loading: wsLoading } = useWorkspace();
   const [activeTab, setActiveTab] = useState<Tab>('executive');
   const hasData = state.records.length > 0;
+
+  // Show auth if not logged in
+  if (wsLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground text-sm">Carregando...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Auth />;
+  }
 
   const handleInsightFilter = (key: string, value: string) => {
     dispatch({ type: 'SET_SEARCH_QUERY', query: value });
@@ -94,10 +111,9 @@ function DashboardContent() {
           <CommandHeader />
 
           <main className="flex-1 p-4 overflow-y-auto">
-            {!hasData && <EmptyState />}
+            {!hasData && activeTab === 'executive' && <EmptyState />}
 
             <AnimatePresence mode="wait">
-              {/* EXECUTIVE VIEW */}
               {activeTab === 'executive' && hasData && (
                 <ViewContainer key="executive">
                   <AlertsBanner />
@@ -106,12 +122,12 @@ function DashboardContent() {
                 </ViewContainer>
               )}
 
-              {/* TACTICAL VIEW */}
               {activeTab === 'tactical' && hasData && (
                 <ViewContainer key="tactical">
                   <AlertsBanner />
                   <TargetsEditor />
                   <OverviewCards />
+                  <ActionCenter />
                   <ActionPanel />
                   <InsightCards onFilterTable={handleInsightFilter} />
                   <ComparisonCards />
@@ -119,7 +135,6 @@ function DashboardContent() {
                 </ViewContainer>
               )}
 
-              {/* DIAGNOSTIC VIEW */}
               {activeTab === 'diagnostic' && hasData && (
                 <ViewContainer key="diagnostic">
                   <AdvancedCharts />
@@ -127,7 +142,6 @@ function DashboardContent() {
                 </ViewContainer>
               )}
 
-              {/* No data states for analysis tabs */}
               {(activeTab === 'tactical' || activeTab === 'diagnostic' || activeTab === 'simulator') && !hasData && (
                 <ViewContainer key="nodata">
                   <div className="text-center py-20 space-y-4">
@@ -155,6 +169,12 @@ function DashboardContent() {
               )}
               {activeTab === 'missing' && (
                 <ViewContainer key="missing"><MissingDataPanel /></ViewContainer>
+              )}
+              {activeTab === 'alerts' && (
+                <ViewContainer key="alerts"><AlertsView /></ViewContainer>
+              )}
+              {activeTab === 'actions' && (
+                <ViewContainer key="actions"><ActionCenter /></ViewContainer>
               )}
             </AnimatePresence>
           </main>
