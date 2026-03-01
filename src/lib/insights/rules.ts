@@ -493,6 +493,93 @@ function checkVanityClicks(metrics: AggregatedMetrics): InsightCard | null {
   return null;
 }
 
+// I21: Entity-level cross-diagnostic (applies I17-I20 per row)
+function checkEntityCrossDiagnostics(rows: GroupedRow[], avgMetrics: AggregatedMetrics): InsightCard[] {
+  const insights: InsightCard[] = [];
+  if (rows.length < 2) return insights;
+
+  for (const row of rows) {
+    const m = row.metrics;
+    if (m.spend_brl < THRESHOLDS.min_spend_for_insight || m.impressions < THRESHOLDS.min_impressions) continue;
+
+    // Entity weak hook
+    if (m.cpm > THRESHOLDS.cpm_high && m.ctr_link < THRESHOLDS.ctr_link_weak) {
+      insights.push({
+        id: `i21-hook-${row.key}`,
+        title: `Hook fraco em "${row.name}"`,
+        description: `CPM R$${m.cpm.toFixed(2)} + CTR ${m.ctr_link.toFixed(2)}%. Criativo não captura atenção. Média geral: CTR ${avgMetrics.ctr_link.toFixed(2)}%.`,
+        evidence: `CPM: R$${m.cpm.toFixed(2)} | CTR: ${m.ctr_link.toFixed(2)}% | Média CTR: ${avgMetrics.ctr_link.toFixed(2)}%`,
+        action: `Trocar criativo de "${row.name}": formato 9:16, demonstração nos primeiros 3s, CTA direto.`,
+        severity: 'high',
+        category: 'creative',
+        confidence: computeConfidence(2, 0.85),
+        affectedItems: [row.key],
+        filterKey: 'name',
+        filterValue: row.name,
+      });
+    }
+
+    // Entity LP not converting
+    if (m.ctr_link >= THRESHOLDS.ctr_link_good && m.result_per_lpv < THRESHOLDS.cvr_lp_low && m.landing_page_views > 15 && m.link_clicks > 20) {
+      const isCritical = m.result_per_lpv < THRESHOLDS.cvr_lp_very_low;
+      insights.push({
+        id: `i21-lp-${row.key}`,
+        title: isCritical ? `🚨 LP de "${row.name}" com conversão crítica` : `LP não converte em "${row.name}"`,
+        description: `CTR ${m.ctr_link.toFixed(2)}% ok, mas CVR LP de apenas ${(m.result_per_lpv * 100).toFixed(1)}%. Média geral: ${(avgMetrics.result_per_lpv * 100).toFixed(1)}%.`,
+        evidence: `CTR: ${m.ctr_link.toFixed(2)}% | CVR LP: ${(m.result_per_lpv * 100).toFixed(1)}% | Média: ${(avgMetrics.result_per_lpv * 100).toFixed(1)}%`,
+        action: isCritical
+          ? `Urgente em "${row.name}": revisar headline, oferta e formulário da LP. Considerar LP diferente.`
+          : `Testar variação de LP para "${row.name}": headline, CTA, prova social.`,
+        severity: isCritical ? 'high' : 'medium',
+        category: 'post_click',
+        confidence: computeConfidence(2, 0.80),
+        affectedItems: [row.key],
+        filterKey: 'name',
+        filterValue: row.name,
+      });
+    }
+
+    // Entity click leakage
+    if (m.ctr_link >= THRESHOLDS.ctr_link_good && m.lpv_rate < THRESHOLDS.lpv_rate_critical && m.link_clicks > 30) {
+      insights.push({
+        id: `i21-leakage-${row.key}`,
+        title: `Vazamento de cliques em "${row.name}"`,
+        description: `CTR ${m.ctr_link.toFixed(2)}% mas LPV Rate ${(m.lpv_rate * 100).toFixed(0)}%. ~${Math.round(m.link_clicks * (1 - m.lpv_rate))} cliques perdidos.`,
+        evidence: `CTR: ${m.ctr_link.toFixed(2)}% | LPV Rate: ${(m.lpv_rate * 100).toFixed(0)}% | Perdidos: ~${Math.round(m.link_clicks * (1 - m.lpv_rate))}`,
+        action: `Verificar LP de "${row.name}": velocidade, redirects, responsividade mobile. Considerar excluir Audience Network.`,
+        severity: 'high',
+        category: 'post_click',
+        confidence: computeConfidence(2, 0.80),
+        affectedItems: [row.key],
+        filterKey: 'name',
+        filterValue: row.name,
+      });
+    }
+
+    // Entity vanity clicks
+    if (m.link_clicks > 30 && m.landing_page_views > 10 &&
+        m.cpc_link > 0 && m.cpc_link < THRESHOLDS.cpc_link_cheap_threshold &&
+        m.ctr_link >= THRESHOLDS.ctr_link_good && m.result_per_lpv < THRESHOLDS.result_per_lpv_low) {
+      insights.push({
+        id: `i21-vanity-${row.key}`,
+        title: `Tráfego de vaidade em "${row.name}"`,
+        description: `CPC R$${m.cpc_link.toFixed(2)} barato + CTR ${m.ctr_link.toFixed(2)}% alto, mas CVR LP ${(m.result_per_lpv * 100).toFixed(1)}%. Investimento de R$${m.spend_brl.toFixed(0)} sem retorno proporcional.`,
+        evidence: `CPC: R$${m.cpc_link.toFixed(2)} | CTR: ${m.ctr_link.toFixed(2)}% | CVR LP: ${(m.result_per_lpv * 100).toFixed(1)}% | Spend: R$${m.spend_brl.toFixed(0)}`,
+        action: `Em "${row.name}": mudar otimização para conversão (não clique). Revisar segmentação e excluir posicionamentos de baixa qualidade.`,
+        severity: 'medium',
+        category: 'efficiency',
+        confidence: computeConfidence(2, 0.80),
+        affectedItems: [row.key],
+        filterKey: 'name',
+        filterValue: row.name,
+      });
+    }
+  }
+
+  // Limit to top 5 entity-level insights to avoid noise
+  return insights.slice(0, 5);
+}
+
 // Main
 export function generateInsights(
   metrics: AggregatedMetrics,
@@ -548,7 +635,7 @@ export function generateInsights(
     if (i16) insights.push(i16);
   }
 
-  // I17–I20: Cross-diagnostic rules
+  // I17–I20: Cross-diagnostic rules (aggregate)
   const i17 = checkWeakHook(metrics);
   if (i17) insights.push(i17);
   const i18 = checkLPConversion(metrics);
@@ -557,6 +644,9 @@ export function generateInsights(
   if (i19) insights.push(i19);
   const i20 = checkVanityClicks(metrics);
   if (i20) insights.push(i20);
+
+  // I21: Entity-level cross-diagnostics
+  insights.push(...checkEntityCrossDiagnostics(rows, metrics));
 
   const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
   return insights.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
