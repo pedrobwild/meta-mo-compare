@@ -1,39 +1,32 @@
 import { useMemo } from 'react';
-import { useAppState } from '@/lib/store';
+import { useAppState, useFilteredRecords } from '@/lib/store';
 import {
   aggregateMetrics,
   computeDeltas,
-  filterByPeriodWithFallback,
   identifyDrivers,
   METRIC_DEFS,
-  getPeriodLabel,
+  getDateRangeLabel,
 } from '@/lib/calculations';
 import KPICard from './KPICard';
 import { TrendingUp, TrendingDown, Zap } from 'lucide-react';
 
 export default function OverviewCards() {
   const { state } = useAppState();
+  const { current, previous } = useFilteredRecords();
 
   const data = useMemo(() => {
-    if (!state.selectedPeriodKey) return null;
-    const current = filterByPeriodWithFallback(state.records, state.selectedPeriodKey, state.truthSource);
-    const previous = state.comparisonPeriodKey
-      ? filterByPeriodWithFallback(state.records, state.comparisonPeriodKey, state.truthSource)
-      : [];
-
+    if (current.length === 0) return null;
     const currentMetrics = aggregateMetrics(current);
     const previousMetrics = previous.length > 0 ? aggregateMetrics(previous) : null;
     const delta = computeDeltas(currentMetrics, previousMetrics);
     const drivers = identifyDrivers(delta, 5);
 
     return { currentMetrics, delta, drivers };
-  }, [state.records, state.selectedPeriodKey, state.comparisonPeriodKey, state.truthSource]);
+  }, [current, previous]);
 
   if (!data) return null;
 
-  const targets = state.targets.find(t => t.period_key === state.selectedPeriodKey);
-
-  const funnel = state.funnelData.find(f => f.period_key === state.selectedPeriodKey);
+  const funnel = state.funnelData.find(f => f.period_key === state.dateFrom);
   const roas = funnel && data.currentMetrics.spend_brl > 0
     ? funnel.receita / data.currentMetrics.spend_brl : 0;
 
@@ -46,13 +39,17 @@ export default function OverviewCards() {
     });
   }
 
+  const compLabel = state.comparisonFrom && state.comparisonTo
+    ? getDateRangeLabel(state.comparisonFrom, state.comparisonTo)
+    : null;
+
   return (
     <div className="space-y-4">
-      {/* KPI Scorecards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
         {metricDefs.map((def, i) => {
           const value = def.key === 'roas' ? roas : (data.currentMetrics as any)[def.key] ?? 0;
           const delta = data.delta.deltas[def.key] || null;
+          const targets = state.targets.find(t => t.period_key === state.dateFrom);
           const target = targets ? (targets as any)[def.key] : undefined;
           return (
             <div key={def.key} style={{ animationDelay: `${i * 50}ms` }}>
@@ -62,15 +59,14 @@ export default function OverviewCards() {
         })}
       </div>
 
-      {/* "O que mudou?" drivers block */}
       {data.drivers.length > 0 && (
         <div className="glass-card p-4">
           <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
             <Zap className="h-4 w-4 text-primary" />
             O que mudou?
-            {state.comparisonPeriodKey && (
+            {compLabel && (
               <span className="text-xs text-muted-foreground font-normal">
-                vs {getPeriodLabel(state.comparisonPeriodKey, state.selectedGranularity)}
+                vs {compLabel}
               </span>
             )}
           </h3>

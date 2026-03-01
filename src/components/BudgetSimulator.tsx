@@ -1,32 +1,27 @@
 import { useMemo, useState } from 'react';
-import { useAppState } from '@/lib/store';
+import { useAppState, useFilteredRecords } from '@/lib/store';
 import {
   aggregateMetrics,
-  filterByPeriodWithFallback,
   groupByLevel,
   formatCurrency,
   formatNumber,
 } from '@/lib/calculations';
 import { computeVerdict } from '@/lib/insights/verdicts';
-import { Calculator, ArrowRight, Percent } from 'lucide-react';
+import { Calculator, ArrowRight } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 
 export default function BudgetSimulator() {
   const { state } = useAppState();
-  const [budgetChange, setBudgetChange] = useState(0); // -50 to +100 %
+  const { current, previous } = useFilteredRecords();
+  const [budgetChange, setBudgetChange] = useState(0);
 
   const simulation = useMemo(() => {
-    if (!state.selectedPeriodKey) return null;
-    const current = filterByPeriodWithFallback(state.records, state.selectedPeriodKey, state.truthSource);
-    const previous = state.comparisonPeriodKey
-      ? filterByPeriodWithFallback(state.records, state.comparisonPeriodKey, state.truthSource)
-      : [];
+    if (current.length === 0) return null;
     const metrics = aggregateMetrics(current);
     const rows = groupByLevel(current, previous, state.analysisLevel, '', false);
 
     if (rows.length === 0) return null;
 
-    // Categorize rows by verdict
     const categorized = rows.map(row => ({
       row,
       verdict: computeVerdict(row, metrics),
@@ -39,24 +34,14 @@ export default function BudgetSimulator() {
     const newSpend = currentSpend * (1 + budgetChange / 100);
     const delta = newSpend - currentSpend;
 
-    // Simple model: distribute extra budget proportionally to scalable items
-    // Remove budget proportionally from pausable items if decreasing
     const scalableSpend = scalable.reduce((s, c) => s + c.row.metrics.spend_brl, 0);
     const pausableSpend = pausable.reduce((s, c) => s + c.row.metrics.spend_brl, 0);
 
-    // Estimate new CPA based on current efficiency
     const currentCPA = metrics.cost_per_result;
-    const scalableCPA = scalable.length > 0
-      ? scalable.reduce((s, c) => s + c.row.metrics.spend_brl, 0) / Math.max(1, scalable.reduce((s, c) => s + c.row.metrics.results, 0))
-      : currentCPA;
-
-    // Simplified projection: if scaling, CPA trends toward scalable CPA; if cutting, toward better efficiency
     let projectedCPA: number;
     if (budgetChange > 0) {
-      // Adding budget: marginal CPA degrades slightly (diminishing returns)
       projectedCPA = currentCPA * (1 + (budgetChange / 100) * 0.15);
     } else {
-      // Cutting budget: if cutting from pausable items, CPA improves
       const cutFromPausable = Math.min(Math.abs(delta), pausableSpend);
       const efficiency = cutFromPausable / Math.abs(delta || 1);
       projectedCPA = currentCPA * (1 - efficiency * 0.1);
@@ -76,7 +61,7 @@ export default function BudgetSimulator() {
       scalableSpend,
       pausableSpend,
     };
-  }, [state.records, state.selectedPeriodKey, state.comparisonPeriodKey, state.truthSource, state.analysisLevel, budgetChange]);
+  }, [current, previous, state.analysisLevel, budgetChange]);
 
   if (!simulation) return null;
 

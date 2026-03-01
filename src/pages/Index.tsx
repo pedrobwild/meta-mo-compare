@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { BarChart3, Upload, FileText, Activity, GitBranch, Trash2, Lightbulb, Eye, Crosshair, ChartScatter, History, Calculator } from 'lucide-react';
+import { BarChart3, FileText, Activity, GitBranch, Trash2, Lightbulb, Eye, Crosshair, ChartScatter, History, Calculator, Cloud } from 'lucide-react';
 import { AppProvider, useAppState } from '@/lib/store';
-import FileUploadComponent from '@/components/FileUpload';
 import GlobalFilters from '@/components/GlobalFilters';
 import OverviewCards from '@/components/OverviewCards';
 import HeatmapTable from '@/components/HeatmapTable';
@@ -20,17 +19,17 @@ import PacingCard from '@/components/PacingCard';
 import AlertsBanner from '@/components/AlertsBanner';
 import BudgetSimulator from '@/components/BudgetSimulator';
 import DecisionLog from '@/components/DecisionLog';
+import MetaSyncButton from '@/components/MetaSyncButton';
 import ThemeToggle from '@/components/ThemeToggle';
 import OnboardingTour from '@/components/OnboardingTour';
 import { Button } from '@/components/ui/button';
 
-type Tab = 'executive' | 'tactical' | 'diagnostic' | 'upload' | 'funnel' | 'report' | 'health' | 'missing' | 'decisions' | 'simulator';
+type Tab = 'executive' | 'tactical' | 'diagnostic' | 'funnel' | 'report' | 'health' | 'missing' | 'decisions' | 'simulator';
 
 const TABS: { key: Tab; label: string; icon: React.ReactNode; group?: string }[] = [
   { key: 'executive', label: 'Executivo', icon: <Eye className="h-4 w-4" />, group: 'análise' },
   { key: 'tactical', label: 'Tático', icon: <Crosshair className="h-4 w-4" />, group: 'análise' },
   { key: 'diagnostic', label: 'Diagnóstico', icon: <ChartScatter className="h-4 w-4" />, group: 'análise' },
-  { key: 'upload', label: 'Importar', icon: <Upload className="h-4 w-4" />, group: 'dados' },
   { key: 'funnel', label: 'Funil', icon: <Activity className="h-4 w-4" />, group: 'dados' },
   { key: 'simulator', label: 'Simulador', icon: <Calculator className="h-4 w-4" />, group: 'dados' },
   { key: 'report', label: 'Relatório', icon: <FileText className="h-4 w-4" />, group: 'output' },
@@ -41,7 +40,7 @@ const TABS: { key: Tab; label: string; icon: React.ReactNode; group?: string }[]
 
 function DashboardContent() {
   const { state, dispatch } = useAppState();
-  const [activeTab, setActiveTab] = useState<Tab>(state.records.length > 0 ? 'executive' : 'upload');
+  const [activeTab, setActiveTab] = useState<Tab>('executive');
   const hasData = state.records.length > 0;
 
   const handleInsightFilter = (key: string, value: string) => {
@@ -101,14 +100,19 @@ function DashboardContent() {
       </header>
 
       <main className="max-w-[1800px] mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        {activeTab === 'upload' && (
-          <div className="max-w-2xl mx-auto space-y-6">
-            <FileUploadComponent />
-            {hasData && (
-              <p className="text-center text-sm text-muted-foreground">
-                {state.records.length} registros • {[...new Set(state.records.map(r => r.period_key))].length} períodos
+        {/* Empty state: show sync button */}
+        {!hasData && (
+          <div className="text-center py-20 space-y-6">
+            <div className="inline-flex items-center justify-center h-20 w-20 rounded-2xl bg-primary/10">
+              <Cloud className="h-10 w-10 text-primary" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold text-foreground">Conecte seus dados do Meta Ads</h2>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Sincronize automaticamente os dados da sua conta Meta Ads para começar a análise.
               </p>
-            )}
+            </div>
+            <MetaSyncButton />
           </div>
         )}
 
@@ -145,14 +149,12 @@ function DashboardContent() {
           </>
         )}
 
-        {/* No data states */}
-        {(activeTab === 'executive' || activeTab === 'tactical' || activeTab === 'diagnostic' || activeTab === 'simulator') && !hasData && (
+        {/* No data states for analysis tabs */}
+        {(activeTab === 'executive' || activeTab === 'tactical' || activeTab === 'diagnostic' || activeTab === 'simulator') && !hasData && activeTab !== 'executive' && (
           <div className="text-center py-20 space-y-4">
             <BarChart3 className="h-16 w-16 text-muted-foreground/30 mx-auto" />
-            <p className="text-muted-foreground">Importe relatórios do Meta Ads para começar</p>
-            <Button variant="outline" onClick={() => setActiveTab('upload')}>
-              <Upload className="h-4 w-4 mr-2" /> Importar Dados
-            </Button>
+            <p className="text-muted-foreground">Sincronize dados do Meta Ads para começar</p>
+            <MetaSyncButton />
           </div>
         )}
 

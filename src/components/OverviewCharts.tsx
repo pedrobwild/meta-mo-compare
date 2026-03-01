@@ -2,9 +2,6 @@ import { useMemo } from 'react';
 import { useAppState } from '@/lib/store';
 import {
   aggregateMetrics,
-  filterByPeriodWithFallback,
-  getAvailablePeriods,
-  getPeriodLabel,
   formatCurrency,
   formatNumber,
   formatPercent,
@@ -47,19 +44,21 @@ export default function OverviewCharts() {
   const { state } = useAppState();
 
   const data = useMemo(() => {
-    const periods = getAvailablePeriods(state.records, state.selectedGranularity);
-    if (periods.length === 0) return [];
+    // Get all unique dates sorted
+    const allDates = [...new Set(state.records.map(r => r.period_start))].sort();
+    if (allDates.length === 0) return [];
 
-    // Show last 8 periods (rolling window)
-    return periods
-      .slice(0, 8)
-      .reverse()
-      .map(p => {
-        const recs = filterByPeriodWithFallback(state.records, p, state.truthSource);
-        const agg = aggregateMetrics(recs);
-        return { period: p, label: getPeriodLabel(p, state.selectedGranularity), ...agg };
-      });
-  }, [state.records, state.truthSource, state.selectedGranularity]);
+    return allDates.slice(-8).map(d => {
+      const recs = state.records.filter(r => r.period_start === d);
+      const agg = aggregateMetrics(recs);
+      const dateObj = new Date(d + 'T00:00:00');
+      return {
+        period: d,
+        label: dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+        ...agg,
+      };
+    });
+  }, [state.records]);
 
   if (data.length === 0) return null;
 
@@ -110,9 +109,7 @@ export default function OverviewCharts() {
 
       {data.length >= 2 && (
         <div className="glass-card p-5">
-          <h3 className="text-sm font-medium text-foreground mb-4">
-            Tendência {state.selectedGranularity === 'week' ? 'Semanal' : 'Diária'}
-          </h3>
+          <h3 className="text-sm font-medium text-foreground mb-4">Tendência Diária</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>

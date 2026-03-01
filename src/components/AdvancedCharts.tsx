@@ -1,14 +1,13 @@
 import { useMemo } from 'react';
-import { useAppState } from '@/lib/store';
+import { useAppState, useFilteredRecords } from '@/lib/store';
 import {
   aggregateMetrics,
-  filterByPeriodWithFallback,
   groupByLevel,
-  getAvailablePeriods,
-  getPeriodLabel,
   formatCurrency,
   formatNumber,
   formatPercent,
+  filterByDateRange,
+  getDateRangeLabel,
 } from '@/lib/calculations';
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Cell,
@@ -26,13 +25,10 @@ const COLORS = [
 
 export default function AdvancedCharts() {
   const { state } = useAppState();
+  const { current, previous } = useFilteredRecords();
 
   const data = useMemo(() => {
-    if (!state.selectedPeriodKey) return null;
-    const current = filterByPeriodWithFallback(state.records, state.selectedPeriodKey, state.truthSource);
-    const previous = state.comparisonPeriodKey
-      ? filterByPeriodWithFallback(state.records, state.comparisonPeriodKey, state.truthSource)
-      : [];
+    if (current.length === 0) return null;
     const avgMetrics = aggregateMetrics(current);
     const rows = groupByLevel(current, previous, state.analysisLevel, '', false);
 
@@ -66,13 +62,14 @@ export default function AdvancedCharts() {
       };
     });
 
-    // Heatmap temporal: period x key metric
-    const periods = getAvailablePeriods(state.records, state.selectedGranularity).slice(0, 8).reverse();
-    const temporalData = periods.map(p => {
-      const recs = filterByPeriodWithFallback(state.records, p, state.truthSource);
+    // Temporal data: per-date metrics
+    const allDates = [...new Set(state.records.map(r => r.period_start))].sort().slice(-8);
+    const temporalData = allDates.map(d => {
+      const recs = state.records.filter(r => r.period_start === d);
       const agg = aggregateMetrics(recs);
+      const dateObj = new Date(d + 'T00:00:00');
       return {
-        period: getPeriodLabel(p, state.selectedGranularity),
+        period: dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
         CPA: agg.cost_per_result,
         CTR: agg.ctr_link,
         CPM: agg.cpm,
@@ -80,15 +77,13 @@ export default function AdvancedCharts() {
       };
     });
 
-    // Waterfall: CPA decomposition (what changed between periods)
+    // Waterfall: CPA decomposition
     let waterfallData: any[] = [];
     if (previous.length > 0) {
       const prevMetrics = aggregateMetrics(previous);
       const prevCPA = prevMetrics.cost_per_result;
       const currCPA = avgMetrics.cost_per_result;
 
-      // Decompose CPA = Spend / Results = (CPM * Impressions/1000) / Results
-      // Simplified: show contribution of CPM, CTR, LPV Rate changes
       const factors = [
         { label: 'CPA Anterior', value: prevCPA, type: 'base' as const },
         {
@@ -112,7 +107,7 @@ export default function AdvancedCharts() {
     }
 
     return { scatterData, radarData, temporalData, waterfallData, avgMetrics };
-  }, [state.records, state.selectedPeriodKey, state.comparisonPeriodKey, state.truthSource, state.analysisLevel, state.selectedGranularity]);
+  }, [current, previous, state.records, state.analysisLevel]);
 
   if (!data) return null;
 
@@ -134,7 +129,6 @@ export default function AdvancedCharts() {
 
   return (
     <div className="space-y-6">
-      {/* Scatter: CPM vs CPA */}
       {data.scatterData.length > 1 && (
         <div className="glass-card p-5">
           <h3 className="text-sm font-medium text-foreground mb-1">CPM vs CPA — Mapa de Eficiência</h3>
@@ -155,7 +149,6 @@ export default function AdvancedCharts() {
                     <Cell key={i} fill={entry.color} r={Math.max(4, Math.min(16, Math.sqrt(entry.spend) * 0.5))} />
                   ))}
                 </Scatter>
-                {/* Average lines */}
                 <ReferenceLine x={data.avgMetrics.cpm} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" strokeOpacity={0.5} />
                 <ReferenceLine y={data.avgMetrics.cost_per_result} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" strokeOpacity={0.5} />
               </ScatterChart>
@@ -164,7 +157,6 @@ export default function AdvancedCharts() {
         </div>
       )}
 
-      {/* Radar Chart */}
       {data.radarData.length > 0 && (
         <div className="glass-card p-5">
           <h3 className="text-sm font-medium text-foreground mb-1">Perfil de Performance</h3>
@@ -191,7 +183,6 @@ export default function AdvancedCharts() {
         </div>
       )}
 
-      {/* Waterfall: CPA Decomposition */}
       {data.waterfallData.length > 0 && (
         <div className="glass-card p-5">
           <h3 className="text-sm font-medium text-foreground mb-1">Decomposição da Mudança no CPA</h3>
@@ -218,7 +209,6 @@ export default function AdvancedCharts() {
         </div>
       )}
 
-      {/* Temporal heatmap as bar chart */}
       <div className="glass-card p-5">
         <h3 className="text-sm font-medium text-foreground mb-1">Tendência Temporal</h3>
         <p className="text-xs text-muted-foreground mb-4">Evolução das métricas-chave ao longo do tempo.</p>

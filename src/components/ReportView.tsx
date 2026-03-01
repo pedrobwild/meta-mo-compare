@@ -1,13 +1,12 @@
 import { useMemo } from 'react';
-import { useAppState } from '@/lib/store';
+import { useAppState, useFilteredRecords } from '@/lib/store';
 import {
   aggregateMetrics,
-  filterByPeriodWithFallback,
   groupByLevel,
   formatCurrency,
   formatNumber,
   formatPercent,
-  getPeriodLabel,
+  getDateRangeLabel,
   computeFunnel,
   METRIC_DEFS,
 } from '@/lib/calculations';
@@ -20,16 +19,10 @@ import autoTable from 'jspdf-autotable';
 
 export default function ReportView() {
   const { state } = useAppState();
-  const periodKey = state.selectedPeriodKey;
-  const compPeriodKey = state.comparisonPeriodKey;
+  const { current, previous } = useFilteredRecords();
 
   const report = useMemo(() => {
-    if (!periodKey) return null;
-
-    const current = filterByPeriodWithFallback(state.records, periodKey, state.truthSource);
-    const previous = compPeriodKey
-      ? filterByPeriodWithFallback(state.records, compPeriodKey, state.truthSource)
-      : [];
+    if (current.length === 0) return null;
 
     const cm = aggregateMetrics(current);
     const pm = previous.length > 0 ? aggregateMetrics(previous) : null;
@@ -58,8 +51,10 @@ export default function ReportView() {
       }
     }
 
-    const periodLabel = getPeriodLabel(periodKey, state.selectedGranularity);
-    const compLabel = compPeriodKey ? getPeriodLabel(compPeriodKey, state.selectedGranularity) : null;
+    const periodLabel = state.dateFrom && state.dateTo
+      ? getDateRangeLabel(state.dateFrom, state.dateTo) : 'Período selecionado';
+    const compLabel = state.comparisonFrom && state.comparisonTo
+      ? getDateRangeLabel(state.comparisonFrom, state.comparisonTo) : null;
 
     let summary = `Em ${periodLabel}, o investimento total foi de ${formatCurrency(cm.spend_brl)} com ${formatNumber(cm.impressions)} impressões, ${formatNumber(cm.link_clicks)} cliques no link e ${formatNumber(cm.results)} resultados.`;
 
@@ -69,7 +64,7 @@ export default function ReportView() {
       summary += ` Comparado a ${compLabel}, o investimento ${spendDelta > 0 ? 'aumentou' : 'diminuiu'} ${Math.abs(spendDelta).toFixed(1)}% e os resultados ${resultsDelta > 0 ? 'aumentaram' : 'diminuíram'} ${Math.abs(resultsDelta).toFixed(1)}%.`;
     }
 
-    const funnel = state.funnelData.find(f => f.period_key === periodKey);
+    const funnel = state.funnelData.find(f => f.period_key === state.dateFrom);
     const funnelComputed = funnel ? computeFunnel(funnel, cm) : null;
     if (funnelComputed && funnelComputed.roas > 0) {
       summary += ` O ROAS foi de ${funnelComputed.roas.toFixed(2)}x com ticket médio de ${formatCurrency(funnelComputed.ticket_medio)}.`;
@@ -81,7 +76,6 @@ export default function ReportView() {
     if (cm.lpv_rate < 0.6) recommendations.push('LPV Rate baixo — desalinhamento entre anúncio e landing page');
     if (recommendations.length === 0) recommendations.push('Resultados estáveis — continuar otimizações incrementais');
 
-    // Verdicts for PDF
     const verdicts = rows.map(row => ({
       name: row.name,
       verdict: computeVerdict(row, cm),
@@ -91,10 +85,10 @@ export default function ReportView() {
     }));
 
     return { summary, highlights, recommendations, cm, pm, periodLabel, compLabel, rows, verdicts };
-  }, [state, periodKey, compPeriodKey]);
+  }, [current, previous, state]);
 
   const exportPDF = () => {
-    if (!report || !periodKey) return;
+    if (!report) return;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     let y = 15;
 
@@ -108,14 +102,12 @@ export default function ReportView() {
     doc.text(`${report.periodLabel}${report.compLabel ? ` vs ${report.compLabel}` : ''}`, 14, y);
     y += 10;
 
-    // Summary
     doc.setTextColor(0);
     doc.setFontSize(10);
     const summaryLines = doc.splitTextToSize(report.summary, 180);
     doc.text(summaryLines, 14, y);
     y += summaryLines.length * 5 + 5;
 
-    // KPIs table
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text('KPIs', 14, y);
@@ -145,7 +137,6 @@ export default function ReportView() {
 
     y = (doc as any).lastAutoTable.finalY + 8;
 
-    // Semaphores
     if (report.verdicts.length > 0) {
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
@@ -174,7 +165,6 @@ export default function ReportView() {
       y = (doc as any).lastAutoTable.finalY + 8;
     }
 
-    // Recommendations
     if (y > 250) { doc.addPage(); y = 15; }
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
@@ -187,10 +177,10 @@ export default function ReportView() {
       y += 5;
     });
 
-    doc.save(`relatorio-meta-ads-${periodKey}.pdf`);
+    doc.save(`relatorio-meta-ads-${state.dateFrom || 'report'}.pdf`);
   };
 
-  if (!report) return <p className="text-muted-foreground text-center py-8">Selecione um período</p>;
+  if (!report) return <p className="text-muted-foreground text-center py-8">Selecione um período nos filtros</p>;
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -244,7 +234,6 @@ export default function ReportView() {
         </div>
       </div>
 
-      {/* Semaphores in report */}
       {report.verdicts.length > 0 && (
         <div className="glass-card p-5">
           <h3 className="text-sm font-medium text-foreground mb-3 uppercase tracking-wider">Semáforo por Campanha</h3>

@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
-import { useAppState } from '@/lib/store';
+import { useAppState, useFilteredRecords } from '@/lib/store';
 import {
   aggregateMetrics,
-  filterByPeriodWithFallback,
+  filterByDateRange,
 } from '@/lib/calculations';
 import { VERTICALS, DEFAULT_VERTICAL } from '@/lib/benchmarks';
 import { AlertTriangle, Bell, X } from 'lucide-react';
@@ -16,19 +16,18 @@ interface Alert {
 
 export default function AlertsBanner() {
   const { state } = useAppState();
+  const { current } = useFilteredRecords();
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   const alerts = useMemo((): Alert[] => {
-    if (!state.selectedPeriodKey) return [];
-    const current = filterByPeriodWithFallback(state.records, state.selectedPeriodKey, state.truthSource);
     if (current.length === 0) return [];
 
     const metrics = aggregateMetrics(current);
     const benchmarks = VERTICALS[DEFAULT_VERTICAL];
-    const targets = state.targets.find(t => t.period_key === state.selectedPeriodKey);
     const result: Alert[] = [];
 
-    // CPA above target
+    // CPA above target — find matching target
+    const targets = state.targets.find(t => t.period_key === state.dateFrom);
     if (targets?.cost_per_result && metrics.cost_per_result > targets.cost_per_result * 1.2) {
       result.push({
         id: 'cpa-above-target',
@@ -37,7 +36,6 @@ export default function AlertsBanner() {
       });
     }
 
-    // Frequency critical
     if (metrics.frequency > benchmarks.frequency_max) {
       result.push({
         id: 'freq-critical',
@@ -46,7 +44,6 @@ export default function AlertsBanner() {
       });
     }
 
-    // CTR below benchmark
     if (metrics.ctr_link < benchmarks.ctr_link * 0.7 && metrics.impressions > 1000) {
       result.push({
         id: 'ctr-below',
@@ -55,7 +52,6 @@ export default function AlertsBanner() {
       });
     }
 
-    // CPM above benchmark
     if (metrics.cpm > benchmarks.cpm * 1.5) {
       result.push({
         id: 'cpm-high',
@@ -64,7 +60,6 @@ export default function AlertsBanner() {
       });
     }
 
-    // LPV Rate below benchmark
     if (metrics.lpv_rate < benchmarks.lpv_rate * 0.7 && metrics.link_clicks > 50) {
       result.push({
         id: 'lpv-low',
@@ -74,7 +69,7 @@ export default function AlertsBanner() {
     }
 
     return result;
-  }, [state.records, state.selectedPeriodKey, state.truthSource, state.targets]);
+  }, [current, state.targets, state.dateFrom]);
 
   const visible = alerts.filter(a => !dismissed.has(a.id));
   if (visible.length === 0) return null;

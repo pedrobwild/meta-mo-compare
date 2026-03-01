@@ -49,7 +49,22 @@ export function computeDeltas(current: AggregatedMetrics, previous: AggregatedMe
   return { current, previous, deltas };
 }
 
-// === Period-based filtering ===
+// === Date range filtering (PRIMARY) ===
+
+export function filterByDateRange(
+  records: MetaRecord[],
+  from: string,
+  to: string,
+  truthSource: TruthSource
+): MetaRecord[] {
+  let filtered = records.filter(r => r.period_start >= from && r.period_start <= to && r.source_type === truthSource);
+  if (filtered.length === 0) {
+    filtered = records.filter(r => r.period_start >= from && r.period_start <= to);
+  }
+  return filtered;
+}
+
+// === Period-based filtering (legacy compat) ===
 
 export function filterRecordsByPeriod(
   records: MetaRecord[],
@@ -171,7 +186,53 @@ export function computeFunnel(
   };
 }
 
-// === Period utilities ===
+// === Date utilities ===
+
+export function getAvailableDates(records: MetaRecord[]): string[] {
+  const dates = [...new Set(records.map(r => r.period_start).filter(Boolean))];
+  return dates.sort().reverse();
+}
+
+export function getDateBounds(records: MetaRecord[]): { min: string; max: string } | null {
+  const dates = records.map(r => r.period_start).filter(Boolean).sort();
+  if (dates.length === 0) return null;
+  return { min: dates[0], max: dates[dates.length - 1] };
+}
+
+export function getDateRangeLabel(from: string, to: string): string {
+  const fmt = (iso: string) => {
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+  };
+  if (from === to) return fmt(from);
+  return `${fmt(from)} — ${fmt(to)}`;
+}
+
+export function computeComparisonRange(from: string, to: string): { from: string; to: string } {
+  const start = new Date(from + 'T00:00:00');
+  const end = new Date(to + 'T00:00:00');
+  const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+  const compEnd = new Date(start);
+  compEnd.setDate(compEnd.getDate() - 1);
+  const compStart = new Date(compEnd);
+  compStart.setDate(compStart.getDate() - days + 1);
+  return {
+    from: compStart.toISOString().slice(0, 10),
+    to: compEnd.toISOString().slice(0, 10),
+  };
+}
+
+// Get unique dates within a range for sparkline/temporal charts
+export function getDatesInRange(records: MetaRecord[], from: string, to: string): string[] {
+  const dates = [...new Set(
+    records
+      .filter(r => r.period_start >= from && r.period_start <= to)
+      .map(r => r.period_start)
+  )];
+  return dates.sort();
+}
+
+// === Period utilities (legacy compat) ===
 
 export function getAvailablePeriods(records: MetaRecord[], granularity?: PeriodGranularity): string[] {
   const filtered = granularity ? records.filter(r => r.granularity === granularity) : records;
@@ -198,7 +259,6 @@ export function getPreviousPeriod(periodKey: string, granularity: PeriodGranular
     d.setDate(d.getDate() - 1);
     return d.toISOString().slice(0, 10);
   }
-  // Date range format: "YYYY-MM-DD_YYYY-MM-DD"
   const rangeParts = periodKey.split('_');
   if (rangeParts.length === 2) {
     const start = new Date(rangeParts[0] + 'T00:00:00');
@@ -210,7 +270,6 @@ export function getPreviousPeriod(periodKey: string, granularity: PeriodGranular
     prevStart.setDate(prevStart.getDate() - days + 1);
     return `${prevStart.toISOString().slice(0, 10)}_${prevEnd.toISOString().slice(0, 10)}`;
   }
-  // Legacy week format
   const match = periodKey.match(/^(\d{4})-W(\d{2})$/);
   if (match) {
     const year = parseInt(match[1]);
@@ -221,7 +280,6 @@ export function getPreviousPeriod(periodKey: string, granularity: PeriodGranular
   return periodKey;
 }
 
-// Legacy
 export function getAvailableMonths(records: MetaRecord[]): string[] {
   const months = [...new Set(records.map(r => r.month_key))].filter(m => m !== 'unknown');
   return months.sort().reverse();
@@ -250,7 +308,6 @@ export function getPeriodLabel(periodKey: string, granularity: PeriodGranularity
     const d = new Date(periodKey + 'T00:00:00');
     return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
   }
-  // Date range format: "YYYY-MM-DD_YYYY-MM-DD"
   const rangeParts = periodKey.split('_');
   if (rangeParts.length === 2) {
     const formatDate = (iso: string) => {
@@ -259,7 +316,6 @@ export function getPeriodLabel(periodKey: string, granularity: PeriodGranularity
     };
     return `${formatDate(rangeParts[0])} - ${formatDate(rangeParts[1])}`;
   }
-  // Legacy week format "YYYY-Www"
   const match = periodKey.match(/^(\d{4})-W(\d{2})$/);
   if (match) {
     return `Sem ${match[2]}/${match[1]}`;
