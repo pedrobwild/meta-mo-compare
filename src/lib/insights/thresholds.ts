@@ -31,4 +31,14 @@ export const THRESHOLDS = {
   creative_degradation_pause: 0.50,
   learning_phase_results: 50,
   learning_phase_min_spend: 150,
+
+  // I17–I20: Cross-diagnostic thresholds
+  ctr_link_weak: 1.0,
+  ctr_link_good: 1.2,
+  cvr_lp_low: 0.05,
+  cvr_lp_very_low: 0.03,
+  cpm_high: 40,
+  lpv_rate_critical: 0.50,
+  result_per_lpv_low: 0.10,
+  cpc_link_cheap_threshold: 1.5,
 };

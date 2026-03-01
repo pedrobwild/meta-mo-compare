@@ -400,6 +400,99 @@ function checkBestHookType(
   return null;
 }
 
+// I17: CPM alto + CTR(link) fraco → Hook fraco
+function checkWeakHook(metrics: AggregatedMetrics): InsightCard | null {
+  if (metrics.impressions < THRESHOLDS.min_impressions) return null;
+  if (metrics.cpm > THRESHOLDS.cpm_high && metrics.ctr_link < THRESHOLDS.ctr_link_weak) {
+    return {
+      id: 'i17-weak-hook',
+      title: 'Hook fraco — CPM alto + CTR baixo',
+      description: `CPM de R$${metrics.cpm.toFixed(2)} com CTR Link de apenas ${metrics.ctr_link.toFixed(2)}%. O criativo não captura atenção suficiente para justificar o custo do leilão.`,
+      evidence: `CPM: R$${metrics.cpm.toFixed(2)} (>${THRESHOLDS.cpm_high}) | CTR Link: ${metrics.ctr_link.toFixed(2)}% (<${THRESHOLDS.ctr_link_weak}%)`,
+      action: 'Subir novos ângulos criativos. Priorizar formato 9:16 com demonstração nos primeiros 3s. Testar pelo menos 3 variações de hook.',
+      severity: 'high',
+      category: 'creative',
+      confidence: computeConfidence(2, 0.90),
+    };
+  }
+  if (metrics.cpm <= THRESHOLDS.cpm_high && metrics.ctr_link < THRESHOLDS.ctr_link_weak && metrics.impressions > 5000) {
+    return {
+      id: 'i17-weak-hook-cheap',
+      title: 'CTR fraco mesmo com CPM baixo — criativo não engaja',
+      description: `CPM acessível (R$${metrics.cpm.toFixed(2)}) mas CTR Link de ${metrics.ctr_link.toFixed(2)}%. O leilão está barato, mas o criativo não converte atenção em clique.`,
+      evidence: `CPM: R$${metrics.cpm.toFixed(2)} | CTR Link: ${metrics.ctr_link.toFixed(2)}%`,
+      action: 'Oportunidade: leilão favorável. Trocar o criativo agora para aproveitar CPM baixo. Testar hooks mais diretos e CTAs claros.',
+      severity: 'medium',
+      category: 'creative',
+      confidence: computeConfidence(2, 0.80),
+    };
+  }
+  return null;
+}
+
+// I18: CTR bom + CVR LP baixo → Problema na Landing Page
+function checkLPConversion(metrics: AggregatedMetrics): InsightCard | null {
+  if (metrics.impressions < THRESHOLDS.min_impressions || metrics.link_clicks < 30) return null;
+  const cvrLP = metrics.result_per_lpv;
+
+  if (metrics.ctr_link >= THRESHOLDS.ctr_link_good && cvrLP < THRESHOLDS.cvr_lp_low && metrics.landing_page_views > 20) {
+    const isCritical = cvrLP < THRESHOLDS.cvr_lp_very_low;
+    return {
+      id: 'i18-lp-conversion',
+      title: isCritical ? '🚨 Landing page com conversão crítica' : 'CTR bom, mas LP não converte',
+      description: `CTR Link de ${metrics.ctr_link.toFixed(2)}% mostra que o criativo funciona, mas apenas ${(cvrLP * 100).toFixed(1)}% dos visitantes da LP convertem.`,
+      evidence: `CTR Link: ${metrics.ctr_link.toFixed(2)}% (✓) | CVR LP: ${(cvrLP * 100).toFixed(1)}% (✗) | LPVs: ${metrics.landing_page_views}`,
+      action: isCritical
+        ? 'Urgente: revisar LP inteira — headline, oferta, formulário e velocidade. Considerar teste A/B de página.'
+        : 'Mexer na página: revisar headline, CTA, prova social e formulário. Verificar velocidade de carregamento.',
+      severity: isCritical ? 'high' : 'medium',
+      category: 'post_click',
+      confidence: computeConfidence(2, 0.85),
+    };
+  }
+  return null;
+}
+
+// I19: CTR bom + LPV Rate baixo → Clique não chega na página
+function checkClickLeakage(metrics: AggregatedMetrics): InsightCard | null {
+  if (metrics.link_clicks < 50) return null;
+  if (metrics.ctr_link >= THRESHOLDS.ctr_link_good && metrics.lpv_rate < THRESHOLDS.lpv_rate_critical) {
+    return {
+      id: 'i19-click-leakage',
+      title: 'Vazamento de cliques — visitantes não chegam à LP',
+      description: `CTR de ${metrics.ctr_link.toFixed(2)}% é bom, mas apenas ${(metrics.lpv_rate * 100).toFixed(0)}% dos cliques viram LPV. Perda de ${(100 - metrics.lpv_rate * 100).toFixed(0)}% dos cliques.`,
+      evidence: `CTR: ${metrics.ctr_link.toFixed(2)}% | LPV Rate: ${(metrics.lpv_rate * 100).toFixed(0)}% | Cliques perdidos: ~${Math.round(metrics.link_clicks * (1 - metrics.lpv_rate))}`,
+      action: 'Verificar: 1) Velocidade da LP (<3s), 2) Redirecionamentos quebrados, 3) LP não responsiva mobile, 4) Cliques acidentais em Audience Network.',
+      severity: 'high',
+      category: 'post_click',
+      confidence: computeConfidence(2, 0.85),
+    };
+  }
+  return null;
+}
+
+// I20: CPC barato + sem resultado → Vanity clicks
+function checkVanityClicks(metrics: AggregatedMetrics): InsightCard | null {
+  if (metrics.link_clicks < 50 || metrics.landing_page_views < 20) return null;
+  if (
+    metrics.cpc_link > 0 && metrics.cpc_link < THRESHOLDS.cpc_link_cheap_threshold &&
+    metrics.ctr_link >= THRESHOLDS.ctr_link_good &&
+    metrics.result_per_lpv < THRESHOLDS.result_per_lpv_low
+  ) {
+    return {
+      id: 'i20-vanity-clicks',
+      title: 'Cliques baratos sem conversão — tráfego de vaidade',
+      description: `CPC R$${metrics.cpc_link.toFixed(2)} e CTR ${metrics.ctr_link.toFixed(2)}% parecem ótimos, mas só ${(metrics.result_per_lpv * 100).toFixed(1)}% dos visitantes convertem.`,
+      evidence: `CPC: R$${metrics.cpc_link.toFixed(2)} (barato) | CTR: ${metrics.ctr_link.toFixed(2)}% | CVR LP: ${(metrics.result_per_lpv * 100).toFixed(1)}%`,
+      action: 'Revisar segmentação: excluir Audience Network. Testar otimização para conversão em vez de cliques no link.',
+      severity: 'medium',
+      category: 'efficiency',
+      confidence: computeConfidence(3, 0.85),
+    };
+  }
+  return null;
+}
+
 // Main
 export function generateInsights(
   metrics: AggregatedMetrics,
@@ -426,7 +519,7 @@ export function generateInsights(
   insights.push(...checkParetoWaste(rows, metrics.spend_brl, metrics.cost_per_result));
   insights.push(...checkComparativeInsights(rows, metrics));
 
-  // I9–I16: new rules — only fire when data is available
+  // I9–I16: Lead quality & creative rules
   const i9 = checkLeadNoShow(metrics, leadQuality);
   if (i9) insights.push(i9);
 
@@ -454,6 +547,16 @@ export function generateInsights(
     const i16 = checkBestHookType(creatives, leadQualityByKey);
     if (i16) insights.push(i16);
   }
+
+  // I17–I20: Cross-diagnostic rules
+  const i17 = checkWeakHook(metrics);
+  if (i17) insights.push(i17);
+  const i18 = checkLPConversion(metrics);
+  if (i18) insights.push(i18);
+  const i19 = checkClickLeakage(metrics);
+  if (i19) insights.push(i19);
+  const i20 = checkVanityClicks(metrics);
+  if (i20) insights.push(i20);
 
   const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
   return insights.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
