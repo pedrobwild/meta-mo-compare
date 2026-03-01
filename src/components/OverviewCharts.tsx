@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useAppState } from '@/lib/store';
+import { useCrossFilter } from '@/lib/crossFilter';
 import {
   aggregateMetrics,
   formatCurrency,
@@ -42,14 +43,24 @@ const CHART_GROUPS = [
 
 export default function OverviewCharts() {
   const { state } = useAppState();
+  const { filter: crossFilter } = useCrossFilter();
+
+  const filteredRecords = useMemo(() => {
+    if (!crossFilter.key || !crossFilter.level) return state.records;
+    return state.records.filter(r => {
+      if (crossFilter.level === 'campaign') return (r.campaign_key || 'sem-campanha') === crossFilter.key;
+      if (crossFilter.level === 'adset') return (r.adset_key || 'sem-conjunto') === crossFilter.key;
+      if (crossFilter.level === 'ad') return r.ad_key === crossFilter.key;
+      return true;
+    });
+  }, [state.records, crossFilter]);
 
   const data = useMemo(() => {
-    // Get all unique dates sorted
-    const allDates = [...new Set(state.records.map(r => r.period_start))].sort();
+    const allDates = [...new Set(filteredRecords.map(r => r.period_start))].sort();
     if (allDates.length === 0) return [];
 
     return allDates.slice(-8).map(d => {
-      const recs = state.records.filter(r => r.period_start === d);
+      const recs = filteredRecords.filter(r => r.period_start === d);
       const agg = aggregateMetrics(recs);
       const dateObj = new Date(d + 'T00:00:00');
       return {
@@ -58,7 +69,7 @@ export default function OverviewCharts() {
         ...agg,
       };
     });
-  }, [state.records]);
+  }, [filteredRecords]);
 
   if (data.length === 0) return null;
 
