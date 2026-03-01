@@ -1,36 +1,40 @@
 import { useState } from 'react';
-import { BarChart3, Upload, FileText, Activity, GitBranch, Trash2, Lightbulb, Lock, Wallet } from 'lucide-react';
+import { BarChart3, Upload, FileText, Activity, GitBranch, Trash2, Lightbulb, Lock, Wallet, Eye, Crosshair, ChartScatter, Zap } from 'lucide-react';
 import { AppProvider, useAppState } from '@/lib/store';
 import FileUploadComponent from '@/components/FileUpload';
 import GlobalFilters from '@/components/GlobalFilters';
 import OverviewCards from '@/components/OverviewCards';
-import RankingTable from '@/components/RankingTable';
+import HeatmapTable from '@/components/HeatmapTable';
 import OverviewCharts from '@/components/OverviewCharts';
+import AdvancedCharts from '@/components/AdvancedCharts';
 import FunnelView from '@/components/FunnelView';
 import ReportView from '@/components/ReportView';
 import DataHealthView from '@/components/DataHealthView';
 import TargetsEditor from '@/components/TargetsEditor';
 import InsightCards from '@/components/InsightCards';
+import ComparisonCards from '@/components/ComparisonCards';
+import ActionPanel from '@/components/ActionPanel';
+import ExecutiveView from '@/components/ExecutiveView';
 import MissingDataPanel from '@/components/MissingDataPanel';
 import { Button } from '@/components/ui/button';
 
-type Tab = 'cockpit' | 'upload' | 'funnel' | 'report' | 'health' | 'missing' | 'budget';
+type Tab = 'executive' | 'tactical' | 'diagnostic' | 'upload' | 'funnel' | 'report' | 'health' | 'missing';
 
-const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
-  { key: 'cockpit', label: 'Cockpit', icon: <BarChart3 className="h-4 w-4" /> },
-  { key: 'upload', label: 'Importar', icon: <Upload className="h-4 w-4" /> },
-  { key: 'funnel', label: 'Funil', icon: <Activity className="h-4 w-4" /> },
-  { key: 'report', label: 'Relatório', icon: <FileText className="h-4 w-4" /> },
-  { key: 'health', label: 'Saúde', icon: <GitBranch className="h-4 w-4" /> },
-  { key: 'missing', label: 'Dados', icon: <Lightbulb className="h-4 w-4" /> },
-  { key: 'budget', label: 'Orçamento', icon: <Wallet className="h-4 w-4" /> },
+const TABS: { key: Tab; label: string; icon: React.ReactNode; group?: string }[] = [
+  { key: 'executive', label: 'Executivo', icon: <Eye className="h-4 w-4" />, group: 'análise' },
+  { key: 'tactical', label: 'Tático', icon: <Crosshair className="h-4 w-4" />, group: 'análise' },
+  { key: 'diagnostic', label: 'Diagnóstico', icon: <ChartScatter className="h-4 w-4" />, group: 'análise' },
+  { key: 'upload', label: 'Importar', icon: <Upload className="h-4 w-4" />, group: 'dados' },
+  { key: 'funnel', label: 'Funil', icon: <Activity className="h-4 w-4" />, group: 'dados' },
+  { key: 'report', label: 'Relatório', icon: <FileText className="h-4 w-4" />, group: 'output' },
+  { key: 'health', label: 'Saúde', icon: <GitBranch className="h-4 w-4" />, group: 'config' },
+  { key: 'missing', label: 'Dados', icon: <Lightbulb className="h-4 w-4" />, group: 'config' },
 ];
 
 function DashboardContent() {
   const { state, dispatch } = useAppState();
-  const [activeTab, setActiveTab] = useState<Tab>(state.records.length > 0 ? 'cockpit' : 'upload');
+  const [activeTab, setActiveTab] = useState<Tab>(state.records.length > 0 ? 'executive' : 'upload');
   const hasData = state.records.length > 0;
-  const hasDailyData = state.records.some(r => r.granularity === 'day');
 
   const handleInsightFilter = (key: string, value: string) => {
     dispatch({ type: 'SET_SEARCH_QUERY', query: value });
@@ -39,7 +43,7 @@ function DashboardContent() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-[1600px] mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-[1800px] mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <BarChart3 className="h-5 w-5 text-primary" />
@@ -50,36 +54,46 @@ function DashboardContent() {
             </div>
           </div>
 
-          <nav className="flex items-center gap-1">
-            {TABS.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all
-                  ${activeTab === tab.key
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-                  }`}
-              >
-                {tab.icon}
-                <span className="hidden sm:inline">{tab.label}</span>
-              </button>
-            ))}
+          <nav className="flex items-center gap-0.5">
+            {TABS.map((tab, i) => {
+              // Add separator between groups
+              const prevGroup = i > 0 ? TABS[i - 1].group : null;
+              const showSep = prevGroup && prevGroup !== tab.group;
+              return (
+                <div key={tab.key} className="flex items-center">
+                  {showSep && <div className="w-px h-5 bg-border mx-1" />}
+                  <button
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all
+                      ${activeTab === tab.key
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                      }`}
+                  >
+                    {tab.icon}
+                    <span className="hidden sm:inline">{tab.label}</span>
+                  </button>
+                </div>
+              );
+            })}
             {hasData && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="ml-2 text-muted-foreground hover:text-destructive"
-                onClick={() => dispatch({ type: 'CLEAR_ALL' })}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <>
+                <div className="w-px h-5 bg-border mx-1" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => dispatch({ type: 'CLEAR_ALL' })}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
             )}
           </nav>
         </div>
       </header>
 
-      <main className="max-w-[1600px] mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-[1800px] mx-auto px-4 py-6 space-y-6">
         {activeTab === 'upload' && (
           <div className="max-w-2xl mx-auto space-y-6">
             <FileUploadComponent />
@@ -91,18 +105,38 @@ function DashboardContent() {
           </div>
         )}
 
-        {activeTab === 'cockpit' && hasData && (
+        {/* EXECUTIVE VIEW */}
+        {activeTab === 'executive' && hasData && (
+          <>
+            <GlobalFilters />
+            <ExecutiveView />
+          </>
+        )}
+
+        {/* TACTICAL VIEW */}
+        {activeTab === 'tactical' && hasData && (
           <>
             <GlobalFilters />
             <TargetsEditor />
             <OverviewCards />
+            <ActionPanel />
             <InsightCards onFilterTable={handleInsightFilter} />
-            <OverviewCharts />
-            <RankingTable />
+            <ComparisonCards />
+            <HeatmapTable />
           </>
         )}
 
-        {activeTab === 'cockpit' && !hasData && (
+        {/* DIAGNOSTIC VIEW */}
+        {activeTab === 'diagnostic' && hasData && (
+          <>
+            <GlobalFilters />
+            <AdvancedCharts />
+            <OverviewCharts />
+          </>
+        )}
+
+        {/* No data states */}
+        {(activeTab === 'executive' || activeTab === 'tactical' || activeTab === 'diagnostic') && !hasData && (
           <div className="text-center py-20 space-y-4">
             <BarChart3 className="h-16 w-16 text-muted-foreground/30 mx-auto" />
             <p className="text-muted-foreground">Importe relatórios do Meta Ads para começar</p>
@@ -116,18 +150,6 @@ function DashboardContent() {
         {activeTab === 'report' && <ReportView />}
         {activeTab === 'health' && <DataHealthView />}
         {activeTab === 'missing' && <MissingDataPanel />}
-
-        {activeTab === 'budget' && (
-          <div className="text-center py-20 space-y-4">
-            <Lock className="h-16 w-16 text-muted-foreground/30 mx-auto" />
-            <h2 className="text-lg font-semibold text-foreground">Orçamento — Bloqueado</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              {hasDailyData
-                ? 'Dados diários detectados! Feature em desenvolvimento.'
-                : 'Esta feature requer dados diários (granularity=day). Importe exports com período de 1 dia para desbloquear a análise de elasticidade de orçamento.'}
-            </p>
-          </div>
-        )}
       </main>
     </div>
   );
