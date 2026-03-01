@@ -1,5 +1,12 @@
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Info } from 'lucide-react';
 import type { MetricDef } from '@/lib/calculations';
+import { VERTICALS, DEFAULT_VERTICAL, getBenchmarkStatus, getTooltipText } from '@/lib/benchmarks';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface KPICardProps {
   def: MetricDef;
@@ -11,10 +18,29 @@ interface KPICardProps {
 export default function KPICard({ def, value, delta, target }: KPICardProps) {
   const isPositive = delta ? (def.invertDelta ? delta.absolute < 0 : delta.absolute > 0) : null;
   const isNeutral = !delta || delta.absolute === 0;
+  const benchmarks = VERTICALS[DEFAULT_VERTICAL];
+  const status = getBenchmarkStatus(def.key, value, benchmarks);
+  const tooltip = getTooltipText(def.key, value, benchmarks);
+
+  const statusBorder = status === 'good' ? 'border-l-positive' : status === 'warning' ? 'border-l-warning' : status === 'bad' ? 'border-l-negative' : '';
 
   return (
-    <div className="glass-card p-4 space-y-2 animate-fade-in">
-      <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">{def.label}</p>
+    <div className={`glass-card p-4 space-y-2 animate-fade-in ${statusBorder ? `border-l-2 ${statusBorder}` : ''}`}>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">{def.label}</p>
+        {tooltip && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className={`h-3.5 w-3.5 cursor-help ${status === 'good' ? 'text-positive' : status === 'warning' ? 'text-warning' : status === 'bad' ? 'text-negative' : 'text-muted-foreground'}`} />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <p className="text-xs">{tooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
       <p className="text-2xl font-bold text-foreground">{def.format(value)}</p>
 
       {delta && !isNeutral && (
