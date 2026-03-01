@@ -165,6 +165,219 @@ export type Database = {
         }
         Relationships: []
       }
+      meta_ads: {
+        Row: {
+          ad_account_id: string
+          ad_id: string
+          adset_id: string
+          campaign_id: string
+          creative_id: string | null
+          effective_status: string | null
+          id: string
+          name: string
+          status: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          ad_account_id: string
+          ad_id: string
+          adset_id: string
+          campaign_id: string
+          creative_id?: string | null
+          effective_status?: string | null
+          id?: string
+          name: string
+          status?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          ad_account_id?: string
+          ad_id?: string
+          adset_id?: string
+          campaign_id?: string
+          creative_id?: string | null
+          effective_status?: string | null
+          id?: string
+          name?: string
+          status?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_ads_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_ads_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meta_adsets: {
+        Row: {
+          ad_account_id: string
+          adset_id: string
+          billing_event: string | null
+          campaign_id: string
+          effective_status: string | null
+          id: string
+          name: string
+          optimization_goal: string | null
+          status: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          ad_account_id: string
+          adset_id: string
+          billing_event?: string | null
+          campaign_id: string
+          effective_status?: string | null
+          id?: string
+          name: string
+          optimization_goal?: string | null
+          status?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          ad_account_id?: string
+          adset_id?: string
+          billing_event?: string | null
+          campaign_id?: string
+          effective_status?: string | null
+          id?: string
+          name?: string
+          optimization_goal?: string | null
+          status?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_adsets_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_adsets_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meta_campaigns: {
+        Row: {
+          ad_account_id: string
+          campaign_id: string
+          effective_status: string | null
+          id: string
+          name: string
+          objective: string | null
+          status: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          ad_account_id: string
+          campaign_id: string
+          effective_status?: string | null
+          id?: string
+          name: string
+          objective?: string | null
+          status?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          ad_account_id?: string
+          campaign_id?: string
+          effective_status?: string | null
+          id?: string
+          name?: string
+          objective?: string | null
+          status?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_campaigns_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_campaigns_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meta_creatives: {
+        Row: {
+          ad_account_id: string
+          asset_spec_json: Json | null
+          creative_id: string
+          id: string
+          name: string | null
+          thumbnail_url: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          ad_account_id: string
+          asset_spec_json?: Json | null
+          creative_id: string
+          id?: string
+          name?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          ad_account_id?: string
+          asset_spec_json?: Json | null
+          creative_id?: string
+          id?: string
+          name?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_creatives_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_creatives_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meta_records: {
         Row: {
           ad_key: string
