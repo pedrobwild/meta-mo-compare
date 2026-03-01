@@ -8,9 +8,11 @@ import {
 import { generateInsights } from '@/lib/insights/rules';
 import type { InsightCard } from '@/lib/insights/types';
 import type { LeadQualityMetrics, CreativeLifecycleRecord } from '@/lib/types';
+import { useCrossFilter } from '@/lib/crossFilter';
 import { supabase } from '@/integrations/supabase/client';
-import { AlertTriangle, Lightbulb, ArrowRight, Shield, Zap, Eye, DollarSign } from 'lucide-react';
+import { AlertTriangle, Lightbulb, ArrowRight, Shield, Zap, Eye, DollarSign, Table } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 function safe(n: number, d: number) { return d > 0 ? n / d : 0; }
 
@@ -101,8 +103,9 @@ interface InsightCardsProps {
 }
 
 export default function InsightCards({ onFilterTable }: InsightCardsProps) {
-  const { state } = useAppState();
+  const { state, dispatch } = useAppState();
   const { current, previous } = useFilteredRecords();
+  const { setFilter } = useCrossFilter();
 
   // Fetch creative lifecycle data
   const [creatives, setCreatives] = useState<CreativeLifecycleRecord[]>([]);
@@ -185,17 +188,33 @@ export default function InsightCards({ onFilterTable }: InsightCardsProps) {
               </p>
             </div>
 
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-primary">{insight.action}</p>
-              {insight.affectedItems && insight.affectedItems.length > 0 && onFilterTable && (
-                <button
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                  onClick={() => onFilterTable('search', insight.affectedItems![0])}
-                >
-                  Ver na tabela <ArrowRight className="h-3 w-3" />
-                </button>
-              )}
-            </div>
+            <p className="text-xs text-primary">{insight.action}</p>
+
+            {insight.affectedItems && insight.affectedItems.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs h-7 mt-1 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                onClick={() => {
+                  const key = insight.affectedItems![0];
+                  const name = insight.filterValue || key;
+                  setFilter({
+                    level: state.analysisLevel === 'ad' ? 'ad' : state.analysisLevel === 'adset' ? 'adset' : 'campaign',
+                    key,
+                    name,
+                  });
+                  dispatch({ type: 'SET_SEARCH_QUERY', query: name });
+                  if (onFilterTable) onFilterTable('search', name);
+                  setTimeout(() => {
+                    document.querySelector('[data-ranking-table]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 100);
+                }}
+              >
+                <Table className="h-3 w-3" />
+                Ver na tabela
+                <ArrowRight className="h-3 w-3" />
+              </Button>
+            )}
           </div>
         ))}
       </div>
