@@ -198,7 +198,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 export function useAppState() {
   const ctx = useContext(AppContext);
   if (!ctx) throw new Error('useAppState must be used within AppProvider');
-  return ctx;
+  return ctx!;
 }
 
 /** Hook that returns current & previous records filtered by date range */
