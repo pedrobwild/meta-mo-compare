@@ -1,1 +1,10 @@
 project_id = "uziafykdgmibcpttagmr"
+
+[functions.ai-chat]
+verify_jwt = false
+
+[functions.ai-recommendations]
+verify_jwt = false
+
+[functions.sync-meta-ads]
+verify_jwt = false
