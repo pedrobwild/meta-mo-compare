@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { MetaRecord, PeriodTargets, FunnelData, SourceType, PeriodGranularity } from './types';
+import type { MetaRecord, PeriodTargets, FunnelData, LeadQualityRecord, SourceType, PeriodGranularity } from './types';
 
 export async function loadRecords(): Promise<MetaRecord[]> {
   const { data, error } = await supabase
@@ -189,6 +189,58 @@ export async function saveFunnel(funnel: FunnelData): Promise<void> {
     .from('funnel_data')
     .upsert(row as any, { onConflict: 'month_key' });
   if (error) console.error('Error saving funnel:', error);
+}
+
+export async function loadLeadQuality(workspaceId?: string): Promise<LeadQualityRecord[]> {
+  let query = supabase.from('lead_quality').select('*').order('date', { ascending: false });
+  if (workspaceId) query = query.eq('workspace_id', workspaceId);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('Error loading lead quality:', error);
+    return [];
+  }
+
+  return (data || []).map((r: any) => ({
+    id: r.id,
+    workspace_id: r.workspace_id,
+    date: r.date,
+    campaign_key: r.campaign_key,
+    adset_key: r.adset_key,
+    ad_key: r.ad_key,
+    leads_total: Number(r.leads_total || 0),
+    leads_atendidos: Number(r.leads_atendidos || 0),
+    leads_qualificados: Number(r.leads_qualificados || 0),
+    visitas_agendadas: Number(r.visitas_agendadas || 0),
+    propostas_enviadas: Number(r.propostas_enviadas || 0),
+    contratos_fechados: Number(r.contratos_fechados || 0),
+    receita_brl: Number(r.receita_brl || 0),
+    notes: r.notes,
+  }));
+}
+
+export async function saveLeadQualityBatch(records: LeadQualityRecord[]): Promise<void> {
+  if (records.length === 0) return;
+
+  const rows = records.map(r => ({
+    workspace_id: r.workspace_id,
+    date: r.date,
+    campaign_key: r.campaign_key,
+    adset_key: r.adset_key || null,
+    ad_key: r.ad_key || null,
+    leads_total: r.leads_total,
+    leads_atendidos: r.leads_atendidos,
+    leads_qualificados: r.leads_qualificados,
+    visitas_agendadas: r.visitas_agendadas,
+    propostas_enviadas: r.propostas_enviadas,
+    contratos_fechados: r.contratos_fechados,
+    receita_brl: r.receita_brl,
+    notes: r.notes || null,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { error } = await supabase.from('lead_quality').insert(rows as any);
+  if (error) console.error('Error saving lead quality:', error);
 }
 
 export async function clearAllData(): Promise<void> {

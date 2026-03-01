@@ -1,4 +1,4 @@
-import { Eye, Crosshair, ChartScatter, Activity, Calculator, FileText, History, GitBranch, Lightbulb, Cloud, RefreshCw, Trash2, BarChart3, Bell, Zap, Bot, LogOut } from 'lucide-react';
+import { Eye, Crosshair, ChartScatter, Activity, Calculator, FileText, History, GitBranch, Lightbulb, Cloud, RefreshCw, Trash2, BarChart3, Bell, Zap, Bot, LogOut, Users } from 'lucide-react';
 import { useAppState } from '@/lib/store';
 import { useWorkspace } from '@/lib/workspace';
 import MetaSyncButton from './MetaSyncButton';
@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
-export type Tab = 'executive' | 'tactical' | 'diagnostic' | 'funnel' | 'simulator' | 'report' | 'decisions' | 'health' | 'missing' | 'alerts' | 'actions' | 'ai';
+export type Tab = 'executive' | 'tactical' | 'diagnostic' | 'funnel' | 'funnel-real' | 'simulator' | 'report' | 'decisions' | 'health' | 'missing' | 'alerts' | 'actions' | 'ai';
 
 const NAV_GROUPS = [
   {
@@ -37,6 +37,7 @@ const NAV_GROUPS = [
     label: 'Dados',
     items: [
       { key: 'funnel' as Tab, label: 'Funil', icon: Activity, description: 'Dados de CRM' },
+      { key: 'funnel-real' as Tab, label: 'Funil Real', icon: Users, description: 'Qualidade de leads' },
       { key: 'simulator' as Tab, label: 'Simulador', icon: Calculator, description: 'Projeções de budget' },
     ],
   },
