@@ -118,11 +118,14 @@ Deno.serve(async (req) => {
     let until = body.until;
     if (!since || !until) {
       if (workspaceId) {
+        // Check both 'meta' and 'meta_ads' for backward compat
         const { data: connector } = await supabase
           .from('connectors')
           .select('last_successful_sync')
           .eq('workspace_id', workspaceId)
-          .eq('provider', 'meta')
+          .in('provider', ['meta', 'meta_ads'])
+          .order('last_successful_sync', { ascending: false, nullsFirst: false })
+          .limit(1)
           .maybeSingle();
         
         if (connector?.last_successful_sync) {
@@ -623,10 +626,30 @@ Deno.serve(async (req) => {
     }
 
     if (workspaceId) {
-      await supabase.from('connectors')
-        .update({ last_successful_sync: new Date().toISOString(), updated_at: new Date().toISOString() })
+      // Upsert connector so incremental sync works even on first run
+      const now = new Date().toISOString();
+      const { data: existing } = await supabase
+        .from('connectors')
+        .select('id')
         .eq('workspace_id', workspaceId)
-        .eq('provider', 'meta');
+        .in('provider', ['meta', 'meta_ads'])
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase.from('connectors')
+          .update({ last_successful_sync: now, updated_at: now })
+          .eq('id', existing.id);
+      } else {
+        await supabase.from('connectors')
+          .insert({
+            workspace_id: workspaceId,
+            provider: 'meta_ads',
+            status: 'active',
+            last_successful_sync: now,
+            config_json: { api_version: META_API_VERSION, attribution: ATTRIBUTION_SETTING },
+          });
+      }
     }
 
     const totalEntities = campaigns.length + adsets.length + ads.length;
