@@ -324,7 +324,7 @@ export type Database = {
       audience_demographics: {
         Row: {
           age_range: string
-          campaign_id: string | null
+          campaign_id: string
           city: string
           clicks: number
           conversions: number
@@ -345,7 +345,7 @@ export type Database = {
         }
         Insert: {
           age_range?: string
-          campaign_id?: string | null
+          campaign_id?: string
           city?: string
           clicks?: number
           conversions?: number
@@ -366,7 +366,7 @@ export type Database = {
         }
         Update: {
           age_range?: string
-          campaign_id?: string | null
+          campaign_id?: string
           city?: string
           clicks?: number
           conversions?: number

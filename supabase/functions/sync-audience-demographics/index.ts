@@ -62,6 +62,7 @@ Deno.serve(async (req) => {
     for (const row of ageGenderData.data || []) {
       const leads = extractActionValue(row.actions, 'lead');
       demoRows.push({
+        campaign_id: '',
         workspace_id,
         date: row.date_start,
         source: 'meta_ads',
@@ -91,6 +92,7 @@ Deno.serve(async (req) => {
     for (const row of regionData.data || []) {
       const leads = extractActionValue(row.actions, 'lead');
       demoRows.push({
+        campaign_id: '',
         workspace_id,
         date: row.date_start,
         source: 'meta_ads',
