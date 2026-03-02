@@ -23,9 +23,46 @@ function useMetricsContext() {
   const prev = previous.length > 0 ? aggregateMetrics(previous) : null;
   const delta = prev ? computeDeltas(metrics, prev) : null;
 
+  // Build top 5 campaigns by spend
+  const campaignMap = new Map<string, { name: string; spend: number; impressions: number; clicks: number; results: number; ctr: number; cpm: number; cpa: number }>();
+  for (const r of current) {
+    const key = r.campaign_key || r.campaign_name || 'unknown';
+    const existing = campaignMap.get(key);
+    if (existing) {
+      existing.spend += r.spend_brl || 0;
+      existing.impressions += r.impressions || 0;
+      existing.clicks += r.link_clicks || 0;
+      existing.results += r.results || 0;
+    } else {
+      campaignMap.set(key, {
+        name: r.campaign_name || key,
+        spend: r.spend_brl || 0,
+        impressions: r.impressions || 0,
+        clicks: r.link_clicks || 0,
+        results: r.results || 0,
+        ctr: 0, cpm: 0, cpa: 0,
+      });
+    }
+  }
+  const topCampanhas = Array.from(campaignMap.values())
+    .map(c => ({
+      ...c,
+      ctr: c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0,
+      cpm: c.impressions > 0 ? (c.spend / c.impressions) * 1000 : 0,
+      cpa: c.results > 0 ? c.spend / c.results : 0,
+    }))
+    .sort((a, b) => b.spend - a.spend)
+    .slice(0, 5);
+
+  // Build alerts from state
+  const alertas = (state as any).alertEvents?.filter((a: any) => a.status === 'open')?.slice(0, 10) || [];
+
   return {
     periodo: `${state.dateFrom} a ${state.dateTo}`,
     registros: current.length,
+    campanhasAtivas: topCampanhas,
+    topCampanhas,
+    alertas: alertas.length > 0 ? alertas : null,
     metricas: {
       investimento: metrics.spend_brl,
       impressoes: metrics.impressions,
