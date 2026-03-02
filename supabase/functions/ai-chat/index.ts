@@ -27,49 +27,52 @@ serve(async (req) => {
 
   try {
     const { messages, metricsContext } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
 
-    const systemMessages = [{ role: "system", content: SYSTEM_PROMPT }];
-    
+    let systemPrompt = SYSTEM_PROMPT;
     if (metricsContext) {
-      systemMessages.push({
-        role: "system",
-        content: `Contexto atual das métricas do usuário:\n${JSON.stringify(metricsContext, null, 2)}`
-      });
+      systemPrompt += `\n\nContexto atual das métricas do usuário:\n${JSON.stringify(metricsContext, null, 2)}`;
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Convert messages: Anthropic expects no "system" role in messages array
+    const anthropicMessages = messages
+      .filter((m: any) => m.role !== 'system')
+      .map((m: any) => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content,
+      }));
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [...systemMessages, ...messages],
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: anthropicMessages,
         stream: true,
       }),
     });
 
     if (!response.ok) {
+      const t = await response.text();
+      console.error("Anthropic API error:", response.status, t);
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns segundos." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes. Adicione créditos em Settings → Workspace → Usage." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "Erro no gateway de IA" }), {
+      return new Response(JSON.stringify({ error: "Erro na API da Anthropic" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    // Stream Anthropic SSE directly to client
     return new Response(response.body, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });

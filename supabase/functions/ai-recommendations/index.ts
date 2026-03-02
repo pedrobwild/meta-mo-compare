@@ -8,8 +8,6 @@ const corsHeaders = {
 const SYSTEM_PROMPT = `Você é um consultor sênior de performance em tráfego pago. 
 Analise os dados de métricas fornecidos e gere recomendações acionáveis de melhoria.
 
-Para cada recomendação, retorne usando a tool "generate_recommendations".
-
 Critérios de análise:
 - CPA acima de benchmark → sugerir otimização de público ou criativo
 - CTR baixo (<1%) → sugerir revisão de copy/criativo
@@ -19,15 +17,17 @@ Critérios de análise:
 - ROAS baixo → sugerir revisão de funil completo
 - Pacing atrasado → sugerir ajuste de orçamento
 
+Tipos de ação disponíveis: "Escalar", "Pausar", "Revisar Criativo", "Expandir Público", "Ajustar Orçamento", "Otimizar Landing Page"
+
 Sempre responda em português do Brasil. Seja específico e acionável.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { metrics, drivers, alerts } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const { metrics, drivers, alerts, topCampaigns } = await req.json();
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
 
     const userContent = `Analise estas métricas e gere recomendações de melhoria:
 
@@ -38,87 +38,79 @@ ${drivers ? `DRIVERS DE MUDANÇA:\n${JSON.stringify(drivers, null, 2)}` : ''}
 
 ${alerts ? `ALERTAS ATIVOS:\n${JSON.stringify(alerts, null, 2)}` : ''}
 
-Gere entre 3 e 6 recomendações priorizadas.`;
+${topCampaigns ? `TOP 5 CAMPANHAS:\n${JSON.stringify(topCampaigns, null, 2)}` : ''}
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+Gere entre 3 e 6 recomendações priorizadas. Use a tool "generate_recommendations".`;
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userContent },
-        ],
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userContent }],
         tools: [{
-          type: "function",
-          function: {
-            name: "generate_recommendations",
-            description: "Gera lista de recomendações acionáveis para melhorar performance de campanhas",
-            parameters: {
-              type: "object",
-              properties: {
-                recommendations: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      title: { type: "string", description: "Título curto da recomendação" },
-                      priority: { type: "string", enum: ["critical", "high", "medium", "low"] },
-                      category: { type: "string", enum: ["criativo", "público", "orçamento", "landing_page", "funil", "posicionamento"] },
-                      why: { type: "string", description: "Por que essa ação é necessária" },
-                      what_to_do: { type: "string", description: "O que fazer concretamente" },
-                      expected_impact: { type: "string", description: "Impacto esperado da ação" },
-                      confidence: { type: "number", description: "Confiança de 0 a 1" },
-                    },
-                    required: ["title", "priority", "category", "why", "what_to_do", "expected_impact", "confidence"],
-                    additionalProperties: false,
-                  }
+          name: "generate_recommendations",
+          description: "Gera lista de recomendações acionáveis para melhorar performance de campanhas",
+          input_schema: {
+            type: "object",
+            properties: {
+              recommendations: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string", description: "Título curto da recomendação" },
+                    action_type: { type: "string", enum: ["Escalar", "Pausar", "Revisar Criativo", "Expandir Público", "Ajustar Orçamento", "Otimizar Landing Page"], description: "Tipo de ação" },
+                    priority: { type: "string", enum: ["critical", "high", "medium", "low"] },
+                    category: { type: "string", enum: ["criativo", "público", "orçamento", "landing_page", "funil", "posicionamento"] },
+                    why: { type: "string", description: "Por que essa ação é necessária" },
+                    what_to_do: { type: "string", description: "O que fazer concretamente" },
+                    expected_impact: { type: "string", description: "Impacto esperado da ação" },
+                    confidence: { type: "number", description: "Confiança de 0 a 1" },
+                    score: { type: "integer", description: "Score de urgência de 0 a 100" },
+                  },
+                  required: ["title", "action_type", "priority", "category", "why", "what_to_do", "expected_impact", "confidence", "score"],
                 }
-              },
-              required: ["recommendations"],
-              additionalProperties: false,
-            }
+              }
+            },
+            required: ["recommendations"],
           }
         }],
-        tool_choice: { type: "function", function: { name: "generate_recommendations" } },
+        tool_choice: { type: "tool", name: "generate_recommendations" },
       }),
     });
 
     if (!response.ok) {
+      const t = await response.text();
+      console.error("Anthropic API error:", response.status, t);
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Limite de requisições excedido." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "Erro no gateway de IA" }), {
+      return new Response(JSON.stringify({ error: "Erro na API da Anthropic" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    const toolUse = data.content?.find((b: any) => b.type === 'tool_use');
     
-    if (toolCall?.function?.arguments) {
-      const parsed = JSON.parse(toolCall.function.arguments);
-      return new Response(JSON.stringify(parsed), {
+    if (toolUse?.input) {
+      return new Response(JSON.stringify(toolUse.input), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Fallback: return raw content
     return new Response(JSON.stringify({ 
       recommendations: [],
-      raw: data.choices?.[0]?.message?.content 
+      raw: data.content?.[0]?.text 
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

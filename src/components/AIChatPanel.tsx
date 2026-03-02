@@ -121,13 +121,25 @@ export default function AIChatPanel({ open, onClose }: { open: boolean; onClose:
           textBuffer = textBuffer.slice(newlineIndex + 1);
           if (line.endsWith('\r')) line = line.slice(0, -1);
           if (line.startsWith(':') || line.trim() === '') continue;
-          if (!line.startsWith('data: ')) continue;
+          if (!line.startsWith('data: ') && !line.startsWith('event: ')) continue;
+
+          // Skip event lines, only process data lines
+          if (line.startsWith('event: ')) continue;
+
           const jsonStr = line.slice(6).trim();
           if (jsonStr === '[DONE]') { streamDone = true; break; }
           try {
             const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) upsertAssistant(content);
+            // Anthropic SSE format: content_block_delta with delta.text
+            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              upsertAssistant(parsed.delta.text);
+            }
+            // Also handle OpenAI format as fallback
+            else if (parsed.choices?.[0]?.delta?.content) {
+              upsertAssistant(parsed.choices[0].delta.content);
+            }
+            // Anthropic message_stop
+            if (parsed.type === 'message_stop') { streamDone = true; break; }
           } catch {
             textBuffer = line + '\n' + textBuffer;
             break;
@@ -140,14 +152,17 @@ export default function AIChatPanel({ open, onClose }: { open: boolean; onClose:
         for (let raw of textBuffer.split('\n')) {
           if (!raw) continue;
           if (raw.endsWith('\r')) raw = raw.slice(0, -1);
-          if (raw.startsWith(':') || raw.trim() === '') continue;
+          if (raw.startsWith(':') || raw.trim() === '' || raw.startsWith('event: ')) continue;
           if (!raw.startsWith('data: ')) continue;
           const jsonStr = raw.slice(6).trim();
           if (jsonStr === '[DONE]') continue;
           try {
             const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) upsertAssistant(content);
+            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              upsertAssistant(parsed.delta.text);
+            } else if (parsed.choices?.[0]?.delta?.content) {
+              upsertAssistant(parsed.choices[0].delta.content);
+            }
           } catch { /* ignore */ }
         }
       }
@@ -185,7 +200,7 @@ export default function AIChatPanel({ open, onClose }: { open: boolean; onClose:
               <div>
                 <h3 className="text-sm font-semibold text-foreground">AI Analyst</h3>
                 <p className="text-[10px] text-muted-foreground">
-                  {metricsContext ? `${metricsContext.registros} registros carregados` : 'Sem dados carregados'}
+                  Claude Sonnet • {metricsContext ? `${metricsContext.registros} registros` : 'Sem dados'}
                 </p>
               </div>
             </div>
