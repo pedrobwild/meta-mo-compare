@@ -157,16 +157,16 @@ export default function InsightCards({ onFilterTable }: InsightCardsProps) {
   if (insights.length === 0) return null;
 
   return (
-    <div className="glass-card p-4">
-      <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
-        <Lightbulb className="h-4 w-4 text-primary" />
+    <div className="bg-card border border-border rounded-meta-card p-4 shadow-meta-subtle">
+      <h3 className="text-meta-body font-semibold text-foreground mb-3 flex items-center gap-2">
+        <Lightbulb className="h-4 w-4 text-primary" strokeWidth={1.5} />
         Insights ({insights.length})
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {insights.map(insight => (
           <div
             key={insight.id}
-            className="border border-border rounded-lg p-3 space-y-2 hover:bg-secondary/30 transition-colors"
+            className="border border-border rounded-meta-btn p-3 space-y-2 hover:bg-secondary/30 transition-colors"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2">

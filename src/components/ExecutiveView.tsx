@@ -35,12 +35,12 @@ let sparklineCounter = 0;
 function Sparkline({ data, dataKey, color }: { data: any[]; dataKey: string; color: string }) {
   const [gradId] = useState(() => `grad-${dataKey}-${++sparklineCounter}`);
   return (
-    <div className="h-12 w-28">
+    <div className="h-8 w-16">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
           <defs>
             <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity={0.4} />
+              <stop offset="0%" stopColor={color} stopOpacity={0.3} />
               <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
@@ -53,15 +53,18 @@ function Sparkline({ data, dataKey, color }: { data: any[]; dataKey: string; col
 
 function TrafficLight({ verdict }: { verdict: VerdictResult }) {
   const styles: Record<string, string> = {
-    scale: 'bg-positive/10 border-positive/30 text-positive',
-    keep: 'bg-primary/10 border-primary/30 text-primary',
-    test_variation: 'bg-warning/10 border-warning/30 text-warning',
-    watch: 'bg-warning/10 border-warning/30 text-warning',
-    pause: 'bg-negative/10 border-negative/30 text-negative',
+    scale: 'bg-positive/10 text-positive',
+    keep: 'bg-primary/10 text-primary',
+    test_variation: 'bg-warning/10 text-warning',
+    watch: 'bg-warning/10 text-warning',
+    pause: 'bg-negative/10 text-negative',
+  };
+  const labels: Record<string, string> = {
+    scale: 'ESCALAR', keep: 'MANTER', test_variation: 'REVISAR', watch: 'REVISAR', pause: 'PAUSAR',
   };
   return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${styles[verdict.verdict] || styles.watch}`}>
-      {verdict.emoji} {verdict.label}
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-meta-pill text-[10px] font-bold uppercase tracking-wider ${styles[verdict.verdict] || styles.watch}`}>
+      {verdict.emoji} {labels[verdict.verdict] || verdict.label}
     </span>
   );
 }
@@ -98,9 +101,9 @@ function CPAWaterfallMini({ current, previous }: { current: any; previous: any |
   const maxAbs = Math.max(...bars.map(b => Math.abs(b.value)), 1);
 
   return (
-    <div className="glass-panel p-4 space-y-2">
+    <div className="bg-card border border-border rounded-meta-card p-4 space-y-2 shadow-meta-subtle">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-foreground">Decomposição do CPA</h3>
+        <h3 className="text-meta-body font-semibold text-foreground">Decomposição do CPA</h3>
         <span className="text-[10px] font-mono text-muted-foreground">
           {formatCurrency(prevCPA)} → {formatCurrency(currCPA)}
         </span>
@@ -180,7 +183,7 @@ function DecisionMatrix2x2({
     if (!active || !payload?.length) return null;
     const d = payload[0].payload;
     return (
-      <div className="glass-panel p-2 text-[10px] space-y-0.5 max-w-[200px]">
+      <div className="bg-card border border-border rounded-meta-card p-2 text-[10px] space-y-0.5 max-w-[200px] shadow-meta-card">
         <p className="font-semibold text-foreground truncate">{d.name}</p>
         <p className="text-muted-foreground">CTR: {d.ctr.toFixed(2)}%</p>
         <p className="text-muted-foreground">{yLabel}: {d.yPct.toFixed(0)}%</p>
@@ -190,7 +193,7 @@ function DecisionMatrix2x2({
   };
 
   return (
-    <div className="glass-panel p-4 space-y-3">
+    <div className="bg-card border border-border rounded-meta-card p-4 space-y-3 shadow-meta-subtle">
       <div>
         <h3 className="text-xs font-semibold text-foreground">Matriz de Decisão</h3>
         <p className="text-[10px] text-muted-foreground">CTR Link × {yLabel} — limiares: {ctrThreshold}% / {(yThreshold * 100).toFixed(0)}%</p>
@@ -442,10 +445,10 @@ export default function ExecutiveView() {
   return (
     <div className="space-y-4">
       {/* Auto Summary */}
-      <div className="glass-panel p-4 border-l-2 border-l-primary">
+      <div className="bg-card border border-border rounded-meta-card p-4 border-l-[3px] border-l-primary shadow-meta-subtle">
         <div className="flex items-start gap-3">
-          <Activity className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-foreground/90 leading-relaxed">{data.summary}</p>
+          <Activity className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" strokeWidth={1.5} />
+          <p className="text-meta-body text-foreground leading-relaxed">{data.summary}</p>
         </div>
       </div>
 
@@ -457,7 +460,7 @@ export default function ExecutiveView() {
         {heroKPIs.map(kpi => {
           const isPositive = kpi.delta ? (kpi.inverted ? kpi.delta.absolute < 0 : kpi.delta.absolute > 0) : null;
           return (
-            <div key={kpi.label} className="glass-panel p-4 flex items-center justify-between gap-4 group hover:border-primary/20 transition-colors">
+            <div key={kpi.label} className="bg-card border border-border rounded-meta-card p-4 flex items-center justify-between gap-4 shadow-meta-subtle hover:shadow-meta-card transition-shadow">
               <div className="space-y-1.5">
                 <p className="metric-label">{kpi.label}</p>
                 <p className={`metric-value ${kpi.colorClass}`}>{kpi.value}</p>
@@ -485,8 +488,8 @@ export default function ExecutiveView() {
       <AdComparisonSelector />
 
       {/* Campaign Semaphores */}
-      <div className="glass-panel p-4">
-        <h3 className="metric-label mb-4">Semáforo por Campanha</h3>
+      <div className="bg-card border border-border rounded-meta-card p-4 shadow-meta-subtle">
+        <h3 className="meta-section-label mb-4">Semáforo por Campanha</h3>
         <div className="space-y-2">
           {data.verdicts.map(({ row, verdict }) => {
             const lq = leadQualityByCampaign[row.key];
@@ -494,11 +497,11 @@ export default function ExecutiveView() {
             const roas = lq && lq.spend > 0 ? lq.receita_brl / lq.spend : null;
 
             return (
-              <div key={row.key} className="flex items-center gap-3 p-3 rounded-md bg-surface-2/50 hover:bg-surface-2 transition-colors border border-transparent hover:border-border/50">
+              <div key={row.key} className="flex items-center gap-3 p-3 rounded-meta-btn bg-secondary/50 hover:bg-secondary transition-colors border border-transparent hover:border-border">
                 <TrafficLight verdict={verdict} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground truncate">{row.name}</p>
-                  <p className="text-[11px] font-mono text-muted-foreground">
+                  <p className="text-meta-body font-semibold text-foreground truncate">{row.name}</p>
+                  <p className="text-meta-caption text-muted-foreground">
                     {formatCurrency(row.metrics.spend_brl)} · {formatNumber(row.metrics.results)} res · CPA {formatCurrency(row.metrics.cost_per_result)}
                   </p>
                   {lq && (
@@ -531,11 +534,11 @@ export default function ExecutiveView() {
 
       {/* Verdict Reasons */}
       {data.verdicts.some(v => v.verdict.reasons.length > 0) && (
-        <div className="glass-panel p-4">
-          <h3 className="metric-label mb-3">Razões dos Veredictos</h3>
+        <div className="bg-card border border-border rounded-meta-card p-4 shadow-meta-subtle">
+          <h3 className="meta-section-label mb-3">Razões dos Veredictos</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {data.verdicts.filter(v => v.verdict.reasons.length > 0).map(({ row, verdict }) => (
-              <div key={row.key} className="space-y-1 p-2.5 rounded-md bg-surface-2/30">
+              <div key={row.key} className="space-y-1 p-2.5 rounded-meta-btn bg-secondary/40">
                 <p className="text-[11px] font-medium text-foreground">{row.name}</p>
                 <ul className="space-y-0.5">
                   {verdict.reasons.map((r, i) => (

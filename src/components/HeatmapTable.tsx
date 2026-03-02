@@ -37,13 +37,13 @@ const columns: ColDef[] = [
   { key: 'impressions', label: 'Impressões', shortLabel: 'Impr.', format: v => formatNumber(v), tooltip: 'Número de vezes que o anúncio foi exibido' },
   { key: 'ctr_link', label: 'CTR Link', shortLabel: 'CTR', format: v => formatPercent(v), tooltip: 'Taxa de cliques no link. Acima de 1% é bom.' },
   { key: 'cpc_link', label: 'CPC Link', shortLabel: 'CPC', format: formatCurrency, invertDelta: true, tooltip: 'Custo por clique no link. Menor = melhor.' },
-  { key: 'cpm', label: 'CPM', shortLabel: 'CPM', format: formatCurrency, invertDelta: true, tooltip: 'Custo por mil impressões. Indica competitividade do leilão.' },
+  { key: 'cpm', label: 'CPM', shortLabel: 'CPM', format: formatCurrency, invertDelta: true, tooltip: 'Custo por mil impressões.' },
   { key: 'landing_page_views', label: 'LPV', shortLabel: 'LPV', format: v => formatNumber(v), tooltip: 'Visualizações da landing page' },
-  { key: 'lpv_rate', label: 'LPV Rate', shortLabel: 'LPV%', format: v => formatPercent(v * 100), tooltip: 'LPV / Cliques. Acima de 70% é bom. Abaixo de 50% = cliques "vazios".' },
+  { key: 'lpv_rate', label: 'LPV Rate', shortLabel: 'LPV%', format: v => formatPercent(v * 100), tooltip: 'LPV / Cliques. Acima de 70% é bom.' },
   { key: 'results', label: 'Resultados', shortLabel: 'Result.', format: v => formatNumber(v), tooltip: 'Conversões registradas' },
-  { key: 'cost_per_result', label: 'Custo/Resultado', shortLabel: 'CPA', format: formatCurrency, invertDelta: true, tooltip: 'Custo por resultado. Principal métrica de eficiência.' },
-  { key: 'result_per_lpv', label: 'Result/LPV', shortLabel: 'R/LPV', format: v => formatPercent(v * 100), tooltip: 'Resultados / LPV. Taxa de conversão pós-landing page.' },
-  { key: 'frequency', label: 'Frequência', shortLabel: 'Freq', format: v => formatNumber(v, 1), tooltip: 'Vezes média que cada pessoa viu o anúncio. Acima de 3 = saturação.' },
+  { key: 'cost_per_result', label: 'Custo/Resultado', shortLabel: 'CPA', format: formatCurrency, invertDelta: true, tooltip: 'Custo por resultado.' },
+  { key: 'result_per_lpv', label: 'Result/LPV', shortLabel: 'R/LPV', format: v => formatPercent(v * 100), tooltip: 'Resultados / LPV.' },
+  { key: 'frequency', label: 'Frequência', shortLabel: 'Freq', format: v => formatNumber(v, 1), tooltip: 'Vezes média que cada pessoa viu o anúncio.' },
 ];
 
 const INVERTED_KEYS = new Set(['cpc_link', 'cpm', 'cost_per_result', 'cost_per_lpv', 'frequency']);
@@ -60,6 +60,53 @@ const LEVEL_LABELS: Record<string, string> = {
   ad: 'Anúncios',
 };
 
+// Verdict pill styles
+function VerdictPill({ verdict }: { verdict: VerdictResult }) {
+  const styles: Record<string, string> = {
+    scale: 'bg-positive/10 text-positive',
+    keep: 'bg-primary/10 text-primary',
+    test_variation: 'bg-warning/10 text-warning',
+    watch: 'bg-warning/10 text-warning',
+    pause: 'bg-negative/10 text-negative',
+  };
+  const labels: Record<string, string> = {
+    scale: 'ESCALAR',
+    keep: 'MANTER',
+    test_variation: 'REVISAR',
+    watch: 'REVISAR',
+    pause: 'PAUSAR',
+  };
+  return (
+    <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-meta-pill text-[10px] font-bold uppercase tracking-wider ${styles[verdict.verdict] || styles.watch}`}>
+      {labels[verdict.verdict] || verdict.label}
+    </span>
+  );
+}
+
+// Score display
+function ScoreDisplay({ verdict }: { verdict: VerdictResult }) {
+  const colorClass = verdict.score >= 80
+    ? 'text-positive'
+    : verdict.score >= 60
+      ? 'text-warning'
+      : 'text-destructive';
+
+  return (
+    <div className="text-center space-y-1">
+      <p className={`text-lg font-bold ${colorClass}`}>{verdict.score}</p>
+      <div className="w-full h-1 rounded-full bg-secondary overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${
+            verdict.score >= 80 ? 'bg-positive' : verdict.score >= 60 ? 'bg-warning' : 'bg-destructive'
+          }`}
+          style={{ width: `${verdict.score}%` }}
+        />
+      </div>
+      <VerdictPill verdict={verdict} />
+    </div>
+  );
+}
+
 export default function HeatmapTable() {
   const { state } = useAppState();
   const { current: currentRecords, previous: previousRecords } = useFilteredRecords();
@@ -70,19 +117,14 @@ export default function HeatmapTable() {
 
   const currentLevel = drillPath.length === 0
     ? state.analysisLevel
-    : drillPath.length === 1
-      ? 'adset'
-      : 'ad';
+    : drillPath.length === 1 ? 'adset' : 'ad';
 
   const filteredCurrent = useMemo(() => {
     if (drillPath.length === 0) return currentRecords;
     let filtered = currentRecords;
     for (const crumb of drillPath) {
-      if (crumb.level === 'campaign') {
-        filtered = filtered.filter(r => (r.campaign_key || 'sem-campanha') === crumb.key);
-      } else if (crumb.level === 'adset') {
-        filtered = filtered.filter(r => (r.adset_key || 'sem-conjunto') === crumb.key);
-      }
+      if (crumb.level === 'campaign') filtered = filtered.filter(r => (r.campaign_key || 'sem-campanha') === crumb.key);
+      else if (crumb.level === 'adset') filtered = filtered.filter(r => (r.adset_key || 'sem-conjunto') === crumb.key);
     }
     return filtered;
   }, [currentRecords, drillPath]);
@@ -91,11 +133,8 @@ export default function HeatmapTable() {
     if (drillPath.length === 0) return previousRecords;
     let filtered = previousRecords;
     for (const crumb of drillPath) {
-      if (crumb.level === 'campaign') {
-        filtered = filtered.filter(r => (r.campaign_key || 'sem-campanha') === crumb.key);
-      } else if (crumb.level === 'adset') {
-        filtered = filtered.filter(r => (r.adset_key || 'sem-conjunto') === crumb.key);
-      }
+      if (crumb.level === 'campaign') filtered = filtered.filter(r => (r.campaign_key || 'sem-campanha') === crumb.key);
+      else if (crumb.level === 'adset') filtered = filtered.filter(r => (r.adset_key || 'sem-conjunto') === crumb.key);
     }
     return filtered;
   }, [previousRecords, drillPath]);
@@ -130,11 +169,9 @@ export default function HeatmapTable() {
 
   const handleDrill = useCallback((row: GroupedRow) => {
     if (!canDrillDown) {
-      // At ad level, emit cross-filter
       setFilter({ level: currentLevel as any, key: row.key, name: row.name });
       return;
     }
-    // Emit cross-filter for the entity being drilled into
     setFilter({ level: currentLevel as any, key: row.key, name: row.name });
     setDrillPath(prev => [...prev, { level: currentLevel as 'campaign' | 'adset', key: row.key, name: row.name }]);
     setSortKey('spend_brl');
@@ -142,12 +179,8 @@ export default function HeatmapTable() {
   }, [canDrillDown, currentLevel, setFilter]);
 
   const handleBreadcrumbClick = useCallback((index: number) => {
-    // index = -1 means root
-    if (index < 0) {
-      setDrillPath([]);
-    } else {
-      setDrillPath(prev => prev.slice(0, index + 1));
-    }
+    if (index < 0) setDrillPath([]);
+    else setDrillPath(prev => prev.slice(0, index + 1));
     setSortKey('spend_brl');
     setSortAsc(false);
   }, []);
@@ -163,28 +196,27 @@ export default function HeatmapTable() {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="glass-card overflow-hidden" data-ranking-table>
-        {/* Breadcrumb Navigation */}
-        <div className="px-3 py-2 border-b border-border/30 bg-secondary/20">
+      <div className="bg-card border border-border rounded-meta-card overflow-hidden shadow-meta-subtle" data-ranking-table>
+        {/* Breadcrumb */}
+        <div className="px-4 py-2.5 border-b border-border bg-secondary/30">
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
                 {drillPath.length > 0 ? (
                   <BreadcrumbLink
-                    className="cursor-pointer flex items-center gap-1 text-xs hover:text-primary transition-colors"
+                    className="cursor-pointer flex items-center gap-1 text-meta-caption hover:text-primary transition-colors"
                     onClick={() => handleBreadcrumbClick(-1)}
                   >
-                    <Home className="h-3 w-3" />
+                    <Home className="h-3 w-3" strokeWidth={1.5} />
                     {LEVEL_LABELS[state.analysisLevel]}
                   </BreadcrumbLink>
                 ) : (
-                  <BreadcrumbPage className="flex items-center gap-1 text-xs font-medium">
-                    <Home className="h-3 w-3" />
+                  <BreadcrumbPage className="flex items-center gap-1 text-meta-caption font-semibold">
+                    <Home className="h-3 w-3" strokeWidth={1.5} />
                     {LEVEL_LABELS[state.analysisLevel]}
                   </BreadcrumbPage>
                 )}
               </BreadcrumbItem>
-
               {drillPath.map((crumb, i) => {
                 const isLast = i === drillPath.length - 1;
                 return (
@@ -192,29 +224,19 @@ export default function HeatmapTable() {
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
                       {isLast ? (
-                        <BreadcrumbPage className="text-xs font-medium max-w-[200px] truncate">
-                          {crumb.name}
-                        </BreadcrumbPage>
+                        <BreadcrumbPage className="text-meta-caption font-semibold max-w-[200px] truncate">{crumb.name}</BreadcrumbPage>
                       ) : (
-                        <BreadcrumbLink
-                          className="cursor-pointer text-xs hover:text-primary transition-colors max-w-[200px] truncate"
-                          onClick={() => handleBreadcrumbClick(i)}
-                        >
-                          {crumb.name}
-                        </BreadcrumbLink>
+                        <BreadcrumbLink className="cursor-pointer text-meta-caption hover:text-primary max-w-[200px] truncate" onClick={() => handleBreadcrumbClick(i)}>{crumb.name}</BreadcrumbLink>
                       )}
                     </BreadcrumbItem>
                   </span>
                 );
               })}
-
               {drillPath.length > 0 && (
                 <>
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
-                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                      {LEVEL_LABELS[currentLevel]}
-                    </span>
+                    <span className="meta-section-label">{LEVEL_LABELS[currentLevel]}</span>
                   </BreadcrumbItem>
                 </>
               )}
@@ -226,28 +248,28 @@ export default function HeatmapTable() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-secondary/30">
-                <th className="text-left p-2.5 text-xs text-muted-foreground font-medium cursor-pointer hover:text-foreground sticky left-0 bg-secondary/30 z-10 min-w-[180px]"
+              <tr className="border-b-2 border-border bg-secondary/40">
+                <th className="text-left p-3 text-meta-label text-muted-foreground font-medium cursor-pointer hover:text-foreground sticky left-0 bg-secondary/40 z-10 min-w-[200px]"
                   onClick={() => toggleSort('name')}>
                   <span className="flex items-center gap-1">Nome <SortIcon col="name" /></span>
                 </th>
-                <th className="text-center p-2.5 text-xs text-muted-foreground font-medium cursor-pointer hover:text-foreground min-w-[60px]"
+                <th className="text-center p-3 text-meta-label text-muted-foreground font-medium cursor-pointer hover:text-foreground min-w-[80px]"
                   onClick={() => toggleSort('verdict')}>
                   <span className="flex items-center justify-center gap-1">Score <SortIcon col="verdict" /></span>
                 </th>
                 {columns.map(col => (
                   <th key={col.key}
-                    className="text-right p-2.5 text-xs text-muted-foreground font-medium cursor-pointer hover:text-foreground whitespace-nowrap"
+                    className="text-right p-3 text-meta-label text-muted-foreground font-medium cursor-pointer hover:text-foreground whitespace-nowrap"
                     onClick={() => toggleSort(col.key)}>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="flex items-center justify-end gap-1">
                           {col.shortLabel} <SortIcon col={col.key} />
-                          <Info className="h-3 w-3 opacity-40" />
+                          <Info className="h-3 w-3 opacity-30" strokeWidth={1.5} />
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-[240px]">
-                        <p className="text-xs">{col.tooltip}</p>
+                      <TooltipContent side="top" className="max-w-[240px] rounded-meta-card shadow-meta-card">
+                        <p className="text-meta-caption">{col.tooltip}</p>
                       </TooltipContent>
                     </Tooltip>
                   </th>
@@ -257,39 +279,35 @@ export default function HeatmapTable() {
             <tbody>
               {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + 2} className="p-8 text-center text-muted-foreground text-sm">
-                    Nenhum dado encontrado neste nível.
-                    {drillPath.length > 0 && (
-                      <button
-                        className="ml-2 text-primary hover:underline"
-                        onClick={() => handleBreadcrumbClick(drillPath.length - 2)}
-                      >
-                        Voltar
-                      </button>
-                    )}
+                  <td colSpan={columns.length + 2} className="p-12 text-center">
+                    <p className="text-meta-heading-sm text-foreground mb-1">Nenhum dado encontrado</p>
+                    <p className="text-meta-body text-muted-foreground">
+                      {drillPath.length > 0 ? (
+                        <button className="text-primary hover:underline" onClick={() => handleBreadcrumbClick(drillPath.length - 2)}>
+                          Voltar ao nível anterior
+                        </button>
+                      ) : 'Ajuste os filtros para ver resultados'}
+                    </p>
                   </td>
                 </tr>
               ) : (
                 sorted.slice(0, 50).map(({ row, verdict }) => (
                   <tr
                     key={row.key}
-                    className={`border-b border-border/30 hover:bg-secondary/40 transition-colors ${canDrillDown ? 'cursor-pointer' : ''}`}
+                    className={`border-b border-border hover:bg-secondary/40 transition-colors duration-100 ${canDrillDown ? 'cursor-pointer' : ''}`}
                     onClick={canDrillDown ? () => handleDrill(row) : undefined}
+                    style={{ height: '52px' }}
                   >
-                    <td className="p-2.5 max-w-[200px] sticky left-0 bg-card z-10">
+                    <td className="px-3 max-w-[240px] sticky left-0 bg-card z-10">
                       <div className="flex items-center gap-1.5">
-                        <p className="truncate text-xs text-foreground font-medium">{row.name}</p>
+                        <p className="truncate text-meta-body font-semibold text-foreground">{row.name}</p>
                         {canDrillDown && (
-                          <span className="text-[9px] text-muted-foreground/60 whitespace-nowrap">
-                            → {nextLevelLabel}
-                          </span>
+                          <span className="text-[9px] text-muted-foreground whitespace-nowrap">→ {nextLevelLabel}</span>
                         )}
                       </div>
                     </td>
-                    <td className="p-2.5 text-center">
-                      <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold ${verdict.color}`}>
-                        {verdict.emoji} {verdict.score}
-                      </span>
+                    <td className="px-3 text-center">
+                      <ScoreDisplay verdict={verdict} />
                     </td>
                     {columns.map(col => {
                       const val = (row.metrics as any)[col.key] ?? 0;
@@ -298,10 +316,10 @@ export default function HeatmapTable() {
                       const hasChange = d && d.percent !== null && Math.abs(d.percent) >= 0.5;
                       const positive = d ? (col.invertDelta ? d.absolute < 0 : d.absolute > 0) : null;
                       return (
-                        <td key={col.key} className={`p-2.5 text-right whitespace-nowrap ${heatColor}`}>
-                          <p className="text-xs text-foreground">{col.format(val)}</p>
+                        <td key={col.key} className={`px-3 text-right whitespace-nowrap ${heatColor}`}>
+                          <p className="text-meta-body text-foreground">{col.format(val)}</p>
                           {hasChange && (
-                            <span className={`text-[10px] ${positive ? 'text-positive' : 'text-negative'}`}>
+                            <span className={`text-[10px] font-medium ${positive ? 'text-positive' : 'text-negative'}`}>
                               {d.percent! > 0 ? '+' : ''}{d.percent!.toFixed(1)}%
                             </span>
                           )}
@@ -315,7 +333,9 @@ export default function HeatmapTable() {
           </table>
         </div>
         {sorted.length > 50 && (
-          <p className="text-xs text-muted-foreground p-3 text-center">Exibindo 50 de {sorted.length} itens</p>
+          <div className="px-4 py-3 border-t border-border flex items-center justify-between text-meta-body text-muted-foreground">
+            <span>Mostrando 1-50 de {sorted.length} itens</span>
+          </div>
         )}
       </div>
     </TooltipProvider>
