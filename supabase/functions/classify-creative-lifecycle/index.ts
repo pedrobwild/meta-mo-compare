@@ -32,7 +32,7 @@ serve(async (req) => {
         .from("ad_creatives")
         .select("*")
         .eq("workspace_id", workspaceId)
-        .in("status", ["active"]);
+        .in("status", ["active", "ACTIVE"]);
 
       if (!creatives?.length) continue;
 
