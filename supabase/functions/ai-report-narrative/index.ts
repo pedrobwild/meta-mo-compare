@@ -16,7 +16,15 @@ Sem texto fora da tool.
 - ROAS saudável: acima de 3x (e-commerce), acima de 5x (performance)
 - CTR saudável: acima de 1,5% (feed), acima de 0,8% (stories)
 - Frequência: acima de 3,5 = sinal de fadiga criativa
-- CPM elevado: acima de R$25 merece atenção`;
+- CPM elevado: acima de R$25 merece atenção
+- ThruPlay Rate saudável: acima de 15% (métrica principal de vídeo 2026)
+
+## MUDANÇAS META 2026
+- Atribuição: 7-day click / 1-day view (28d view REMOVIDO)
+- ThruPlay substitui 10-second video views
+- Advantage+ é a estrutura padrão recomendada
+- Partnership Ads: +13% CTR, -19% CPA na média
+- Dados históricos: máx 13 meses (unique counts)`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -55,6 +63,8 @@ KPIs do período atual:
 - Conversões: ${ma.resultados || 0} (era ${mp.resultados || 0})
 - CTR: ${(ma.ctr_link || 0).toFixed(2)}% (era ${(mp.ctr_link || 0).toFixed(2)}%)
 - CPM: R$ ${(ma.cpm || 0).toFixed(2)}
+
+Atribuição: 7-day click / 1-day view (padrão Meta 2026)
 
 Top 3 campanhas:
 ${topCampanhasJson}

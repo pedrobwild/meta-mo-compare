@@ -30,12 +30,16 @@ export const METRICS: Record<string, MetricDefinition> = {
   spend: { key: 'spend', label: 'Investimento', shortLabel: 'Spend', type: 'sum', unit: 'currency', format: formatCurrency },
   impressions: { key: 'impressions', label: 'Impressões', type: 'sum', unit: 'number', format: v => formatNumber(v) },
   reach: { key: 'reach', label: 'Alcance', type: 'sum', unit: 'number', format: v => formatNumber(v) },
+  // Meta 2026: "viewers" will replace "reach" by Jun/2026 — kept as alias/fallback
+  viewers: { key: 'viewers', label: 'Viewers', shortLabel: 'Viewers', type: 'sum', unit: 'number', format: v => formatNumber(v) },
   clicks: { key: 'clicks', label: 'Cliques', type: 'sum', unit: 'number', format: v => formatNumber(v) },
   inline_link_clicks: { key: 'inline_link_clicks', label: 'Cliques no Link', shortLabel: 'Link Clicks', type: 'sum', unit: 'number', format: v => formatNumber(v) },
   landing_page_views: { key: 'landing_page_views', label: 'LPV', type: 'sum', unit: 'number', format: v => formatNumber(v) },
   results_leads: { key: 'results_leads', label: 'Leads', type: 'sum', unit: 'number', format: v => formatNumber(v) },
   purchases: { key: 'purchases', label: 'Compras', type: 'sum', unit: 'number', format: v => formatNumber(v) },
   purchase_value: { key: 'purchase_value', label: 'Receita Ads', type: 'sum', unit: 'currency', format: formatCurrency },
+  // Meta 2026: ThruPlay replaces deprecated 10-second video views
+  thruplay: { key: 'thruplay', label: 'ThruPlay', shortLabel: 'ThruPlay', type: 'sum', unit: 'number', format: v => formatNumber(v) },
 
   // ─── Ratios (weighted) ───
   ctr_link: { key: 'ctr_link', label: 'CTR Link', type: 'ratio', unit: 'percent', numerator: 'inline_link_clicks', denominator: 'impressions', multiplier: 100, format: v => formatPercent(v) },
@@ -44,6 +48,8 @@ export const METRICS: Record<string, MetricDefinition> = {
   frequency: { key: 'frequency', label: 'Frequência', type: 'ratio', unit: 'ratio', numerator: 'impressions', denominator: 'reach', format: v => formatNumber(v, 2) },
   cpa_lead: { key: 'cpa_lead', label: 'CPA Lead', type: 'ratio', unit: 'currency', numerator: 'spend', denominator: 'results_leads', invertDelta: true, format: formatCurrency },
   roas: { key: 'roas', label: 'ROAS', type: 'ratio', unit: 'ratio', numerator: 'purchase_value', denominator: 'spend', format: v => formatNumber(v, 2) },
+  // Meta 2026: ThruPlay Rate = ThruPlay / Impressions (main video metric)
+  thruplay_rate: { key: 'thruplay_rate', label: 'ThruPlay Rate', type: 'ratio', unit: 'percent', numerator: 'thruplay', denominator: 'impressions', multiplier: 100, format: v => formatPercent(v) },
 
   // ─── Derived (funnel) ───
   lpv_rate: { key: 'lpv_rate', label: 'Taxa LPV', type: 'derived', unit: 'percent', numerator: 'landing_page_views', denominator: 'inline_link_clicks', multiplier: 100, format: v => formatPercent(v) },

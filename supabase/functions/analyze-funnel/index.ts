@@ -21,6 +21,7 @@ serve(async (req) => {
 
 PERÍODO: ${f.period || "Últimos 30 dias"}
 INVESTIMENTO TOTAL: R$ ${f.total_spend?.toFixed(2) || "N/A"}
+ATRIBUIÇÃO: 7-day click / 1-day view (padrão Meta 2026)
 
 FUNIL GERAL:
 - Leads gerados: ${f.total_leads}
@@ -49,6 +50,7 @@ REFERÊNCIAS INTERNAS (Guia de Bordo bwild):
 - SLA ideal: 1ª tentativa < 5 min; 6–8 tentativas em 3 dias
 - Sinal de baixa qualidade: %MQL caindo, muitos leads inválidos, taxa de contato < 60%
 - Ação: negativar públicos ruins, qualificar copy ("para empresas com faturamento > R$X"), adicionar 1–2 perguntas filtro no formulário
+- Considerar migração para Advantage+ Audience se qualidade de lead estiver caindo com interesses manuais
 
 Analise e responda:
 1. Qual o maior gargalo do funil agora? (onde mais leads estão sendo perdidos)
@@ -82,7 +84,9 @@ Com base no perfil e histórico, responda:
       throw new Error("Invalid mode or missing data");
     }
 
-    const systemPrompt = `Você é um analista sênior de tráfego pago da agência bwild. Analise os dados de funil fornecidos com base no Guia de Bordo interno. Seja objetivo, direto e orientado a resultados. Responda em português brasileiro. Máximo 400 palavras.`;
+    const systemPrompt = `Você é um analista sênior de tráfego pago da agência bwild. Analise os dados de funil fornecidos com base no Guia de Bordo interno. Seja objetivo, direto e orientado a resultados. Responda em português brasileiro. Máximo 400 palavras.
+
+MUDANÇAS META 2026: Atribuição padrão é 7d click / 1d view. Advantage+ Audience é a segmentação recomendada. ThruPlay é a métrica de vídeo principal.`;
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",

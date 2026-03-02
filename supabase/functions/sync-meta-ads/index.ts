@@ -5,6 +5,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+// ─── META API 2026 CONSTANTS ───
+
+const META_API_VERSION = 'v22.0'; // Updated from v21.0 for 2026 compliance
+
+// Attribution windows available post-Jan 2026:
+// - 1d_click, 7d_click (recommended default), 1d_view
+// Removed: 7d_view, 28d_view (discontinued Jan 12, 2026)
+const ATTRIBUTION_SETTING = '7d_click,1d_view';
+
+// Data retention limits (Jan 2026):
+const MAX_UNIQUE_COUNT_MONTHS = 13;
+const MAX_FREQUENCY_BREAKDOWN_MONTHS = 6;
+
 // ─── HELPERS ───
 
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
@@ -16,7 +29,6 @@ async function fetchWithRetry(url: string, retries = 5, backoff = 3000): Promise
 
     const errorText = await res.text();
 
-    // Retry on rate-limit, server errors, or Meta transient errors (code 2)
     const isRetryable = res.status === 429 || res.status >= 500 ||
       (res.status === 400 && (errorText.includes('"code":2') || errorText.includes('temporarily unavailable')));
 
@@ -57,6 +69,18 @@ function getActionValues(actions: any[] | undefined): Record<string, number> {
   return map;
 }
 
+// Enforce data retention limits (Meta 2026)
+function enforceDataLimits(since: string): string {
+  const maxDate = new Date();
+  maxDate.setMonth(maxDate.getMonth() - MAX_UNIQUE_COUNT_MONTHS);
+  const sinceDate = new Date(since);
+  if (sinceDate < maxDate) {
+    console.log(`[SYNC] Date ${since} exceeds ${MAX_UNIQUE_COUNT_MONTHS}-month limit, clamping to ${maxDate.toISOString().slice(0, 10)}`);
+    return maxDate.toISOString().slice(0, 10);
+  }
+  return since;
+}
+
 // ─── MAIN ───
 
 Deno.serve(async (req) => {
@@ -78,7 +102,6 @@ Deno.serve(async (req) => {
 
     if (!accessToken) throw new Error('Missing META_ACCESS_TOKEN');
 
-    // Parse request body
     let body: any = {};
     try { body = await req.json(); } catch { /* no body */ }
 
@@ -87,14 +110,13 @@ Deno.serve(async (req) => {
     if (!externalAccountId) throw new Error('Missing ad_account_id');
 
     const accountId = externalAccountId.startsWith('act_') ? externalAccountId : `act_${externalAccountId}`;
-    const level = body.level || 'ad'; // campaign | adset | ad
-    const breakdowns = body.breakdowns || []; // ['publisher_platform', 'device_platform']
+    const level = body.level || 'ad';
+    const breakdowns = body.breakdowns || [];
 
     // Determine date range
     let since = body.since;
     let until = body.until;
     if (!since || !until) {
-      // Incremental: check last sync
       if (workspaceId) {
         const { data: connector } = await supabase
           .from('connectors')
@@ -105,7 +127,7 @@ Deno.serve(async (req) => {
         
         if (connector?.last_successful_sync) {
           const lastSync = new Date(connector.last_successful_sync);
-          lastSync.setDate(lastSync.getDate() - 2); // 2-day buffer
+          lastSync.setDate(lastSync.getDate() - 2);
           since = lastSync.toISOString().slice(0, 10);
         }
       }
@@ -118,6 +140,9 @@ Deno.serve(async (req) => {
         until = new Date().toISOString().slice(0, 10);
       }
     }
+
+    // Enforce Meta 2026 data retention limits
+    since = enforceDataLimits(since);
 
     // Ensure ad_account exists in DB if workspace provided
     if (workspaceId) {
@@ -140,7 +165,6 @@ Deno.serve(async (req) => {
         adAccountDbId = newAcc?.id || null;
       }
 
-      // Create sync_run
       const { data: run } = await supabase
         .from('sync_runs')
         .insert({
@@ -148,7 +172,7 @@ Deno.serve(async (req) => {
           provider: 'meta',
           ad_account_id: adAccountDbId,
           status: 'running',
-          params_json: { since, until, level, breakdowns },
+          params_json: { since, until, level, breakdowns, api_version: META_API_VERSION, attribution: ATTRIBUTION_SETTING },
         })
         .select('id')
         .single();
@@ -158,10 +182,10 @@ Deno.serve(async (req) => {
     // ─── STEP 1: Fetch & upsert ENTITIES ───
     let campaignsUpserted = 0, adsetsUpserted = 0, adsUpserted = 0;
 
-    // Campaigns
-    const campaignsUrl = `https://graph.facebook.com/v21.0/${accountId}/campaigns?fields=id,name,objective,status,effective_status&limit=500&access_token=${accessToken}`;
+    // Campaigns — now includes smart_promotion_type for Advantage+ detection
+    const campaignsUrl = `https://graph.facebook.com/${META_API_VERSION}/${accountId}/campaigns?fields=id,name,objective,status,effective_status,smart_promotion_type,buying_type&limit=500&access_token=${accessToken}`;
     const campaigns = await fetchAllPages(campaignsUrl);
-    console.log(`[SYNC] Fetched ${campaigns.length} campaigns from Meta API`);
+    console.log(`[SYNC] Fetched ${campaigns.length} campaigns from Meta API (${META_API_VERSION})`);
     if (campaigns.length > 0 && workspaceId && adAccountDbId) {
       const rows = campaigns.map((c: any) => ({
         workspace_id: workspaceId,
@@ -187,8 +211,8 @@ Deno.serve(async (req) => {
       console.log(`[SYNC] meta_campaigns: ${campaignsUpserted} upserted`);
     }
 
-    // Adsets
-    const adsetsUrl = `https://graph.facebook.com/v21.0/${accountId}/adsets?fields=id,campaign_id,name,status,effective_status,optimization_goal,billing_event&limit=500&access_token=${accessToken}`;
+    // Adsets — includes targeting for Advantage+ Audience detection
+    const adsetsUrl = `https://graph.facebook.com/${META_API_VERSION}/${accountId}/adsets?fields=id,campaign_id,name,status,effective_status,optimization_goal,billing_event,targeting&limit=500&access_token=${accessToken}`;
     const adsets = await fetchAllPages(adsetsUrl);
     console.log(`[SYNC] Fetched ${adsets.length} adsets from Meta API`);
     if (adsets.length > 0 && workspaceId && adAccountDbId) {
@@ -219,7 +243,7 @@ Deno.serve(async (req) => {
     }
 
     // Ads
-    const adsUrl = `https://graph.facebook.com/v21.0/${accountId}/ads?fields=id,campaign_id,adset_id,name,status,effective_status,creative{id}&limit=500&access_token=${accessToken}`;
+    const adsUrl = `https://graph.facebook.com/${META_API_VERSION}/${accountId}/ads?fields=id,campaign_id,adset_id,name,status,effective_status,creative{id}&limit=500&access_token=${accessToken}`;
     const ads = await fetchAllPages(adsUrl);
     console.log(`[SYNC] Fetched ${ads.length} ads from Meta API`);
     if (ads.length > 0 && workspaceId && adAccountDbId) {
@@ -250,7 +274,11 @@ Deno.serve(async (req) => {
     }
 
     // ─── STEP 2: Fetch INSIGHTS ───
-
+    // Updated fields for Meta 2026:
+    // - Added video_thru_play_actions (replaces deprecated 10-second views)
+    // - Added video_2_sec_continuous_video_views (new standard)
+    // - Using attribution_setting for 7d_click/1d_view
+    // - "reach" kept as fallback; "viewers" will be added when available (Jun 2026)
     const insightFields = [
       'campaign_id', 'campaign_name', 'adset_id', 'adset_name', 'ad_id', 'ad_name',
       'spend', 'impressions', 'reach', 'clicks', 'inline_link_clicks',
@@ -258,6 +286,10 @@ Deno.serve(async (req) => {
       'actions', 'action_values', 'cost_per_action_type',
       'inline_link_click_ctr', 'cost_per_inline_link_click',
       'website_purchase_roas',
+      // Meta 2026: ThruPlay replaces 10-second views
+      'video_thru_play_actions',
+      // Meta 2026: 2-second continuous views (new standard)
+      'video_continuous_2_sec_watched_actions',
     ].join(',');
 
     const params = new URLSearchParams({
@@ -267,15 +299,17 @@ Deno.serve(async (req) => {
       limit: '500',
       access_token: accessToken,
       time_range: JSON.stringify({ since, until }),
+      // Meta 2026: Set attribution window explicitly (7d click + 1d view)
+      attribution_setting: ATTRIBUTION_SETTING,
     });
 
     if (breakdowns.length > 0) {
       params.set('breakdowns', breakdowns.join(','));
     }
 
-    const insightsUrl = `https://graph.facebook.com/v21.0/${accountId}/insights?${params.toString()}`;
+    const insightsUrl = `https://graph.facebook.com/${META_API_VERSION}/${accountId}/insights?${params.toString()}`;
     const insights = await fetchAllPages(insightsUrl);
-    console.log(`[SYNC] Fetched ${insights.length} insight rows from Meta API (level=${level}, ${since} to ${until})`);
+    console.log(`[SYNC] Fetched ${insights.length} insight rows from Meta API (level=${level}, ${since} to ${until}, attribution=${ATTRIBUTION_SETTING})`);
 
     // ─── STEP 3: Transform & Upsert ───
 
@@ -294,6 +328,16 @@ Deno.serve(async (req) => {
       const addToCart = getActionValue(ins.actions, 'add_to_cart') || getActionValue(ins.actions, 'offsite_conversion.fb_pixel_add_to_cart');
       const initiateCheckout = getActionValue(ins.actions, 'initiate_checkout') || getActionValue(ins.actions, 'offsite_conversion.fb_pixel_initiate_checkout');
 
+      // Meta 2026: Extract ThruPlay (replaces 10-second views)
+      const thruplay = getActionValue(ins.video_thru_play_actions, 'video_view') || getActionValue(ins.actions, 'video_view');
+
+      // Placement: replace deprecated "Facebook Video Feeds" with "Facebook Reels"
+      let placement = ins.publisher_platform && ins.platform_position ? `${ins.publisher_platform}_${ins.platform_position}` : '';
+      if (placement.toLowerCase().includes('video_feeds') || placement.toLowerCase().includes('facebook_video_feeds')) {
+        placement = placement.replace(/video_feeds/gi, 'reels');
+        console.log(`[SYNC] Remapped deprecated placement "Video Feeds" → "Reels"`);
+      }
+
       const row: any = {
         workspace_id: workspaceId,
         ad_account_id: adAccountDbId,
@@ -303,7 +347,7 @@ Deno.serve(async (req) => {
         adset_id: ins.adset_id || '',
         ad_id: ins.ad_id || '',
         creative_id: null,
-        placement: ins.publisher_platform && ins.platform_position ? `${ins.publisher_platform}_${ins.platform_position}` : '',
+        placement,
         device_platform: ins.device_platform || '',
         publisher_platform: ins.publisher_platform || '',
         age: ins.age || '',
@@ -326,7 +370,8 @@ Deno.serve(async (req) => {
         frequency: reach > 0 ? impressions / reach : null,
         cpa_lead: resultsLeads > 0 ? spend / resultsLeads : null,
         roas: spend > 0 && purchaseValue > 0 ? purchaseValue / spend : null,
-        attribution_setting: '',
+        // Meta 2026: Use 7d_click/1d_view attribution
+        attribution_setting: ATTRIBUTION_SETTING,
         actions_json: ins.actions || null,
       };
 
@@ -337,7 +382,6 @@ Deno.serve(async (req) => {
     let upserted = 0;
     const CONFLICT_COLS = 'workspace_id,ad_account_id,date,level,campaign_id,adset_id,ad_id,placement,device_platform,publisher_platform,age,gender,country,attribution_setting';
     if (factRows.length > 0 && workspaceId && adAccountDbId) {
-      // Ensure all breakdown columns are non-null strings
       for (const row of factRows) {
         row.campaign_id = row.campaign_id || '';
         row.adset_id = row.adset_id || '';
@@ -361,7 +405,6 @@ Deno.serve(async (req) => {
           });
         if (error) {
           console.error('Fact upsert batch error:', JSON.stringify(error));
-          // Fallback: insert one by one with same conflict spec
           for (const row of batch) {
             const { error: singleErr } = await supabase
               .from('facts_meta_insights_daily')
@@ -472,6 +515,7 @@ Deno.serve(async (req) => {
       ads: { fetched: ads.length, upserted: adsUpserted },
       insights: { fetched: insights.length, upserted },
       legacy_records: { upserted: legacyUpserted },
+      meta_2026: { api_version: META_API_VERSION, attribution: ATTRIBUTION_SETTING },
     };
     console.log(`[SYNC] ✅ COMPLETE:`, JSON.stringify(summary));
 
@@ -482,7 +526,7 @@ Deno.serve(async (req) => {
         entities: totalEntities,
         insights_fetched: insights.length,
         details: summary,
-        message: `${upserted} insights + ${totalEntities} entities sincronizados`,
+        message: `${upserted} insights + ${totalEntities} entities sincronizados (${META_API_VERSION}, ${ATTRIBUTION_SETTING})`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

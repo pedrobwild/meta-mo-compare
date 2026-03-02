@@ -18,6 +18,7 @@ serve(async (req) => {
 
     if (mode === "individual" && creativeData) {
       const c = creativeData;
+      const isPartnership = c.is_partnership ? "\n⚠️ Este é um Partnership Ad (co-criado com criador/parceiro). Partnership Ads performam em média 13% melhor em CTR e 19% melhor em CPA." : "";
       userPrompt = `Analise a performance deste criativo do Meta Ads da bwild e dê uma recomendação clara.
 
 CRIATIVO:
@@ -27,7 +28,7 @@ Hook: ${c.hook || "Não definido"}
 CTA: ${c.cta || "Não definido"}
 Tipo: ${c.creative_type || "Não definido"}
 Dias no ar: ${c.days_active}
-Estágio atual: ${c.lifecycle_stage}
+Estágio atual: ${c.lifecycle_stage}${isPartnership}
 
 MÉTRICAS HISTÓRICAS (dia a dia, últimos 14 dias):
 ${JSON.stringify(c.daily_metrics || [], null, 2)}
@@ -37,18 +38,21 @@ MÉDIAS DA CONTA (referência):
 - CPL médio: R$ ${c.account_avg_cpl?.toFixed(2) || "N/A"}
 - Frequência média: ${c.account_avg_freq?.toFixed(2) || "N/A"}
 - CPL meta: R$ ${c.cpl_meta?.toFixed(2) || "N/A"}
+- ThruPlay Rate médio: ${c.thruplay_rate?.toFixed(2) || "N/A"}%
 
 BENCHMARKS INTERNOS (Guia de Bordo bwild):
 - CTR saudável: > 1,2% (feed)
 - Frequência máxima prospecting: 2,5 (7 dias)
 - CVR LP saudável: > 10%
+- ThruPlay Rate saudável: > 15% (métrica principal de vídeo 2026)
 - Regra: pausar se CPL > 1,5× meta e gasto ≥ 1× CPL meta
 
 Responda:
 1. Diagnóstico: o que os dados indicam sobre este criativo?
 2. Causa provável do estágio atual (fatigado/declinando/escalando)
 3. Ação recomendada agora (com urgência: Alta/Média/Baixa)
-4. Sugestão de próximo criativo a testar (ângulo, hook, variação)`;
+4. Sugestão de próximo criativo a testar (ângulo, hook, variação)
+5. Se vídeo: análise de ThruPlay Rate e recomendação de hook`;
     } else if (mode === "portfolio" && portfolioData) {
       const p = portfolioData;
       userPrompt = `Analise o portfólio completo de criativos ativos da conta bwild e gere recomendações estratégicas.
@@ -59,6 +63,7 @@ Em Peaking: ${p.peaking_count}
 Em Declining: ${p.declining_count}
 Em Fatigued: ${p.fatigued_count}
 Em Fresh: ${p.fresh_count}
+Partnership Ads: ${p.partnership_count || 0}
 
 CRIATIVOS POR ÂNGULO:
 ${JSON.stringify(p.angles || [], null, 2)}
@@ -79,6 +84,8 @@ Com base no Guia de Bordo bwild:
 - Rotacionar 2–3 novas peças/semana para evitar fadiga
 - Testar 1 variável por vez
 - Ângulos: dor, prova social, autoridade, oferta, demonstração
+- Partnership Ads performam ~13% melhor em CTR (considerar no mix)
+- ThruPlay Rate > 15% = bom engajamento de vídeo (métrica 2026)
 
 Responda:
 1. Saúde geral do portfólio de criativos (1 parágrafo)
@@ -86,12 +93,15 @@ Responda:
 3. Quais criativos pausar agora (lista com motivo)
 4. Quais criativos escalar agora (lista com motivo)
 5. Sugestão de 3 novos criativos para testar (ângulo + hook + variável a testar)
-6. Risco identificado no portfólio atual`;
+6. Risco identificado no portfólio atual
+7. Recomendação sobre Partnership Ads se aplicável`;
     } else {
       throw new Error("Invalid mode or missing data");
     }
 
-    const systemPrompt = `Você é um analista sênior de tráfego pago da agência bwild, especialista em Meta Ads. Analise os dados fornecidos com base no Guia de Bordo interno da bwild. Seja objetivo, direto e orientado a resultados. Nunca dê respostas genéricas. Sempre baseie na análise nos dados reais. Quando algo está ruim, diga claramente com o número. Responda em português brasileiro. Máximo 400 palavras.`;
+    const systemPrompt = `Você é um analista sênior de tráfego pago da agência bwild, especialista em Meta Ads. Analise os dados fornecidos com base no Guia de Bordo interno da bwild. Seja objetivo, direto e orientado a resultados. Nunca dê respostas genéricas. Sempre baseie na análise nos dados reais. Quando algo está ruim, diga claramente com o número. Responda em português brasileiro. Máximo 400 palavras.
+
+MUDANÇAS META 2026: ThruPlay é a métrica principal de vídeo (substitui 10-second views). Atribuição: 7d click / 1d view. Partnership Ads +13% CTR. Advantage+ é a estrutura padrão.`;
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
