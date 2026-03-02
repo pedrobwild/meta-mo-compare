@@ -78,24 +78,24 @@ export default function PacingCard() {
   ];
 
   return (
-    <div className="glass-card p-5">
-      <h3 className="text-sm font-medium text-foreground mb-4 flex items-center gap-2">
-        <Calendar className="h-4 w-4 text-primary" />
+    <div className="bg-card border border-border rounded-meta-card p-5 shadow-meta-subtle">
+      <h3 className="text-meta-body font-semibold text-foreground mb-4 flex items-center gap-2">
+        <Calendar className="h-4 w-4 text-primary" strokeWidth={1.5} />
         Projeção ({pacing.datesWithData} dias com dados)
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {items.map(item => (
-          <div key={item.label} className="space-y-2 p-3 rounded-lg bg-secondary/30">
+          <div key={item.label} className="space-y-2 p-3 rounded-meta-btn bg-secondary/30">
             <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">{item.label}</span>
-              <span className="text-[11px] text-muted-foreground">{item.avg}</span>
+              <span className="meta-section-label">{item.label}</span>
+              <span className="text-meta-label text-muted-foreground">{item.avg}</span>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-foreground">{item.current}</span>
-              <span className="text-xs text-muted-foreground">atual</span>
+              <span className="text-meta-title font-bold text-foreground">{item.current}</span>
+              <span className="text-meta-caption text-muted-foreground">atual</span>
             </div>
-            <div className="flex items-center gap-2 text-xs">
-              <TrendingUp className="h-3.5 w-3.5 text-primary" />
+            <div className="flex items-center gap-2 text-meta-caption">
+              <TrendingUp className="h-3.5 w-3.5 text-primary" strokeWidth={1.5} />
               <span className="text-foreground">Projeção mensal: {item.projected}</span>
             </div>
             {item.target && item.pacing !== null && (

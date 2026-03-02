@@ -55,10 +55,7 @@ function useMetricsContext() {
     .sort((a, b) => b.spend - a.spend)
     .slice(0, 5);
 
-  // Compute account-level ROAS (if purchase_value available, approximate from results/spend)
   const accountRoas = metrics.spend_brl > 0 ? +(metrics.results / metrics.spend_brl).toFixed(4) : 0;
-
-  // Build alerts from state
   const alertas = (state as any).alertEvents?.filter((a: any) => a.status === 'open')?.slice(0, 10) || [];
 
   return {
@@ -164,23 +161,18 @@ export default function AIChatPanel({ open, onClose }: { open: boolean; onClose:
           if (line.endsWith('\r')) line = line.slice(0, -1);
           if (line.startsWith(':') || line.trim() === '') continue;
           if (!line.startsWith('data: ') && !line.startsWith('event: ')) continue;
-
-          // Skip event lines, only process data lines
           if (line.startsWith('event: ')) continue;
 
           const jsonStr = line.slice(6).trim();
           if (jsonStr === '[DONE]') { streamDone = true; break; }
           try {
             const parsed = JSON.parse(jsonStr);
-            // Anthropic SSE format: content_block_delta with delta.text
             if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
               upsertAssistant(parsed.delta.text);
             }
-            // Also handle OpenAI format as fallback
             else if (parsed.choices?.[0]?.delta?.content) {
               upsertAssistant(parsed.choices[0].delta.content);
             }
-            // Anthropic message_stop
             if (parsed.type === 'message_stop') { streamDone = true; break; }
           } catch {
             textBuffer = line + '\n' + textBuffer;
@@ -231,40 +223,40 @@ export default function AIChatPanel({ open, onClose }: { open: boolean; onClose:
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-          className="fixed right-0 top-0 bottom-0 w-full max-w-md z-50 bg-card border-l border-border shadow-2xl flex flex-col"
+          className="fixed right-0 top-0 bottom-0 w-full max-w-md z-50 bg-card border-l border-border shadow-meta-modal flex flex-col"
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-border">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary/15 flex items-center justify-center">
-                <Bot className="h-4 w-4 text-primary" />
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-meta-btn bg-primary/10 flex items-center justify-center">
+                <Bot className="h-4 w-4 text-primary" strokeWidth={1.5} />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-foreground">AI Analyst</h3>
-                <p className="text-[10px] text-muted-foreground">
-                  Claude Sonnet • {metricsContext ? `${metricsContext.registros} registros` : 'Sem dados'}
+                <h3 className="text-meta-body font-semibold text-foreground">AI Analyst</h3>
+                <p className="text-meta-label text-muted-foreground">
+                  {metricsContext ? `${metricsContext.registros} registros` : 'Sem dados'}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-1">
               {messages.length > 0 && (
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setMessages([])}>
-                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-meta-btn hover:bg-secondary" onClick={() => setMessages([])}>
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
                 </Button>
               )}
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
-                <X className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-meta-btn hover:bg-secondary" onClick={onClose}>
+                <X className="h-4 w-4" strokeWidth={1.5} />
               </Button>
             </div>
           </div>
 
           {/* Messages */}
-          <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+          <ScrollArea className="flex-1 p-4 bg-secondary/30" ref={scrollRef}>
             {messages.length === 0 ? (
               <div className="space-y-4 py-8">
                 <div className="text-center space-y-2">
-                  <Sparkles className="h-8 w-8 text-primary/40 mx-auto" />
-                  <p className="text-sm text-muted-foreground">
+                  <Sparkles className="h-8 w-8 text-primary/40 mx-auto" strokeWidth={1.5} />
+                  <p className="text-meta-body text-muted-foreground">
                     Pergunte sobre suas campanhas ou peça análises
                   </p>
                 </div>
@@ -273,7 +265,7 @@ export default function AIChatPanel({ open, onClose }: { open: boolean; onClose:
                     <button
                       key={i}
                       onClick={() => sendMessage(s)}
-                      className="w-full text-left text-xs p-2.5 rounded-lg border border-border hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors"
+                      className="w-full text-left text-meta-caption p-2.5 rounded-meta-btn border border-border bg-card hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {s}
                     </button>
@@ -284,10 +276,10 @@ export default function AIChatPanel({ open, onClose }: { open: boolean; onClose:
               <div className="space-y-4">
                 {messages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
+                    <div className={`max-w-[85%] px-3.5 py-2.5 text-meta-body ${
                       msg.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-secondary/70 text-foreground'
+                        ? 'bg-primary text-primary-foreground rounded-[18px_18px_4px_18px]'
+                        : 'bg-card border border-border text-foreground rounded-[4px_18px_18px_18px] shadow-meta-subtle'
                     }`}>
                       {msg.role === 'assistant' ? (
                         <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>ul]:mb-2 [&>ol]:mb-2 [&>h1]:text-base [&>h2]:text-sm [&>h3]:text-sm">
@@ -301,8 +293,15 @@ export default function AIChatPanel({ open, onClose }: { open: boolean; onClose:
                 ))}
                 {isLoading && messages[messages.length - 1]?.role === 'user' && (
                   <div className="flex justify-start">
-                    <div className="bg-secondary/70 rounded-xl px-3 py-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <div className="bg-card border border-border rounded-[4px_18px_18px_18px] px-4 py-3 shadow-meta-subtle">
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                        <span className="text-meta-caption text-muted-foreground">Analisando...</span>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -311,8 +310,8 @@ export default function AIChatPanel({ open, onClose }: { open: boolean; onClose:
           </ScrollArea>
 
           {/* Input */}
-          <div className="p-3 border-t border-border">
-            <div className="flex gap-2">
+          <div className="p-3 border-t border-border bg-card">
+            <div className="flex gap-2 items-end">
               <Textarea
                 ref={textareaRef}
                 value={input}
@@ -324,20 +323,20 @@ export default function AIChatPanel({ open, onClose }: { open: boolean; onClose:
                   }
                 }}
                 placeholder="Pergunte sobre suas campanhas..."
-                className="min-h-[40px] max-h-[120px] resize-none text-sm"
+                className="min-h-[40px] max-h-[120px] resize-none text-meta-body rounded-[24px] px-4 py-2.5 border-border"
                 rows={1}
               />
               <Button
                 size="icon"
                 onClick={() => sendMessage(input)}
                 disabled={!input.trim() || isLoading}
-                className="h-10 w-10 flex-shrink-0"
+                className="h-10 w-10 flex-shrink-0 rounded-full"
               >
-                <Send className="h-4 w-4" />
+                <Send className="h-4 w-4" strokeWidth={1.5} />
               </Button>
             </div>
             {metricsContext && (
-              <p className="text-[9px] text-muted-foreground/50 mt-1.5 px-1">
+              <p className="text-meta-label text-muted-foreground/50 mt-1.5 px-1">
                 IA tem acesso ao contexto de métricas do período selecionado
               </p>
             )}
