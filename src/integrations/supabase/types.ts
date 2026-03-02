@@ -809,6 +809,89 @@ export type Database = {
           },
         ]
       }
+      funnel_daily_snapshot: {
+        Row: {
+          avg_time_to_contact_minutes: number | null
+          campaign_id: string | null
+          close_rate_pct: number | null
+          closed_lost: number | null
+          closed_won: number | null
+          contact_rate_pct: number | null
+          contacted: number | null
+          cost_per_mql: number | null
+          cost_per_sql: number | null
+          created_at: string | null
+          date: string
+          id: string
+          mql_count: number | null
+          mql_rate_pct: number | null
+          roas_real: number | null
+          scheduled: number | null
+          source: string | null
+          sql_count: number | null
+          sql_rate_pct: number | null
+          total_leads: number | null
+          total_revenue: number | null
+          workspace_id: string
+        }
+        Insert: {
+          avg_time_to_contact_minutes?: number | null
+          campaign_id?: string | null
+          close_rate_pct?: number | null
+          closed_lost?: number | null
+          closed_won?: number | null
+          contact_rate_pct?: number | null
+          contacted?: number | null
+          cost_per_mql?: number | null
+          cost_per_sql?: number | null
+          created_at?: string | null
+          date: string
+          id?: string
+          mql_count?: number | null
+          mql_rate_pct?: number | null
+          roas_real?: number | null
+          scheduled?: number | null
+          source?: string | null
+          sql_count?: number | null
+          sql_rate_pct?: number | null
+          total_leads?: number | null
+          total_revenue?: number | null
+          workspace_id: string
+        }
+        Update: {
+          avg_time_to_contact_minutes?: number | null
+          campaign_id?: string | null
+          close_rate_pct?: number | null
+          closed_lost?: number | null
+          closed_won?: number | null
+          contact_rate_pct?: number | null
+          contacted?: number | null
+          cost_per_mql?: number | null
+          cost_per_sql?: number | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          mql_count?: number | null
+          mql_rate_pct?: number | null
+          roas_real?: number | null
+          scheduled?: number | null
+          source?: string | null
+          sql_count?: number | null
+          sql_rate_pct?: number | null
+          total_leads?: number | null
+          total_revenue?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnel_daily_snapshot_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       funnel_data: {
         Row: {
           created_at: string
@@ -852,6 +935,155 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "funnel_data_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      funnel_leads: {
+        Row: {
+          ad_id: string | null
+          adset_id: string | null
+          campaign_id: string | null
+          contact_attempts: number | null
+          created_at: string | null
+          deal_value: number | null
+          email: string | null
+          first_contact_at: string | null
+          id: string
+          is_mql: boolean | null
+          is_sql: boolean | null
+          is_valid_contact: boolean | null
+          lead_id: string
+          lost_reason: string | null
+          name: string | null
+          phone: string | null
+          qualification_notes: string | null
+          source: string | null
+          stage: string | null
+          stage_updated_at: string | null
+          time_to_first_contact_minutes: number | null
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
+          workspace_id: string
+        }
+        Insert: {
+          ad_id?: string | null
+          adset_id?: string | null
+          campaign_id?: string | null
+          contact_attempts?: number | null
+          created_at?: string | null
+          deal_value?: number | null
+          email?: string | null
+          first_contact_at?: string | null
+          id?: string
+          is_mql?: boolean | null
+          is_sql?: boolean | null
+          is_valid_contact?: boolean | null
+          lead_id: string
+          lost_reason?: string | null
+          name?: string | null
+          phone?: string | null
+          qualification_notes?: string | null
+          source?: string | null
+          stage?: string | null
+          stage_updated_at?: string | null
+          time_to_first_contact_minutes?: number | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+          workspace_id: string
+        }
+        Update: {
+          ad_id?: string | null
+          adset_id?: string | null
+          campaign_id?: string | null
+          contact_attempts?: number | null
+          created_at?: string | null
+          deal_value?: number | null
+          email?: string | null
+          first_contact_at?: string | null
+          id?: string
+          is_mql?: boolean | null
+          is_sql?: boolean | null
+          is_valid_contact?: boolean | null
+          lead_id?: string
+          lost_reason?: string | null
+          name?: string | null
+          phone?: string | null
+          qualification_notes?: string | null
+          source?: string | null
+          stage?: string | null
+          stage_updated_at?: string | null
+          time_to_first_contact_minutes?: number | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnel_leads_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      funnel_stage_history: {
+        Row: {
+          changed_at: string | null
+          changed_by: string | null
+          from_stage: string | null
+          id: string
+          lead_id: string
+          notes: string | null
+          time_in_previous_stage_hours: number | null
+          to_stage: string
+          workspace_id: string
+        }
+        Insert: {
+          changed_at?: string | null
+          changed_by?: string | null
+          from_stage?: string | null
+          id?: string
+          lead_id: string
+          notes?: string | null
+          time_in_previous_stage_hours?: number | null
+          to_stage: string
+          workspace_id: string
+        }
+        Update: {
+          changed_at?: string | null
+          changed_by?: string | null
+          from_stage?: string | null
+          id?: string
+          lead_id?: string
+          notes?: string | null
+          time_in_previous_stage_hours?: number | null
+          to_stage?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnel_stage_history_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "funnel_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funnel_stage_history_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
