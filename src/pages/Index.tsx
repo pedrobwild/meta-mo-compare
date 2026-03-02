@@ -26,7 +26,7 @@ import MissingDataPanel from '@/components/MissingDataPanel';
 import PacingCard from '@/components/PacingCard';
 import AlertsBanner from '@/components/AlertsBanner';
 import BudgetSimulator from '@/components/BudgetSimulator';
-import DecisionLog from '@/components/DecisionLog';
+import DecisionsModule from '@/components/DecisionsModule';
 import MetaSyncButton from '@/components/MetaSyncButton';
 import OnboardingTour from '@/components/OnboardingTour';
 import ActionCenter from '@/components/ActionCenter';
@@ -195,7 +195,7 @@ function DashboardContent() {
                 <ViewContainer key="report"><ReportView /></ViewContainer>
               )}
               {activeTab === 'decisions' && (
-                <ViewContainer key="decisions"><DecisionLog /></ViewContainer>
+                <ViewContainer key="decisions"><DecisionsModule /></ViewContainer>
               )}
               {activeTab === 'health' && (
                 <ViewContainer key="health"><DataHealthView /></ViewContainer>
