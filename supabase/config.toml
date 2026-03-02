@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.sync-instagram]
 verify_jwt = false
+
+[functions.send-alert-email]
+verify_jwt = false
