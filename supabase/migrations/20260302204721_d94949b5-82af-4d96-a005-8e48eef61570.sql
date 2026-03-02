@@ -1,0 +1,1 @@
+ALTER TABLE public.funnel_leads ADD CONSTRAINT funnel_leads_workspace_lead_id_unique UNIQUE (workspace_id, lead_id);
