@@ -156,10 +156,12 @@ Deno.serve(async (req) => {
     }
 
     // ─── STEP 1: Fetch & upsert ENTITIES ───
+    let campaignsUpserted = 0, adsetsUpserted = 0, adsUpserted = 0;
 
     // Campaigns
     const campaignsUrl = `https://graph.facebook.com/v21.0/${accountId}/campaigns?fields=id,name,objective,status,effective_status&limit=500&access_token=${accessToken}`;
     const campaigns = await fetchAllPages(campaignsUrl);
+    console.log(`[SYNC] Fetched ${campaigns.length} campaigns from Meta API`);
     if (campaigns.length > 0 && workspaceId && adAccountDbId) {
       const rows = campaigns.map((c: any) => ({
         workspace_id: workspaceId,
@@ -172,15 +174,23 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       }));
       for (let i = 0; i < rows.length; i += 500) {
-        await supabase.from('meta_campaigns').upsert(rows.slice(i, i + 500), {
+        const batch = rows.slice(i, i + 500);
+        const { error, data } = await supabase.from('meta_campaigns').upsert(batch, {
           onConflict: 'workspace_id,ad_account_id,campaign_id'
-        });
+        }).select('id');
+        if (error) {
+          console.error(`[SYNC] meta_campaigns upsert error:`, JSON.stringify(error));
+        } else {
+          campaignsUpserted += data?.length || batch.length;
+        }
       }
+      console.log(`[SYNC] meta_campaigns: ${campaignsUpserted} upserted`);
     }
 
     // Adsets
     const adsetsUrl = `https://graph.facebook.com/v21.0/${accountId}/adsets?fields=id,campaign_id,name,status,effective_status,optimization_goal,billing_event&limit=500&access_token=${accessToken}`;
     const adsets = await fetchAllPages(adsetsUrl);
+    console.log(`[SYNC] Fetched ${adsets.length} adsets from Meta API`);
     if (adsets.length > 0 && workspaceId && adAccountDbId) {
       const rows = adsets.map((a: any) => ({
         workspace_id: workspaceId,
@@ -195,15 +205,23 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       }));
       for (let i = 0; i < rows.length; i += 500) {
-        await supabase.from('meta_adsets').upsert(rows.slice(i, i + 500), {
+        const batch = rows.slice(i, i + 500);
+        const { error, data } = await supabase.from('meta_adsets').upsert(batch, {
           onConflict: 'workspace_id,ad_account_id,adset_id'
-        });
+        }).select('id');
+        if (error) {
+          console.error(`[SYNC] meta_adsets upsert error:`, JSON.stringify(error));
+        } else {
+          adsetsUpserted += data?.length || batch.length;
+        }
       }
+      console.log(`[SYNC] meta_adsets: ${adsetsUpserted} upserted`);
     }
 
     // Ads
     const adsUrl = `https://graph.facebook.com/v21.0/${accountId}/ads?fields=id,campaign_id,adset_id,name,status,effective_status,creative{id}&limit=500&access_token=${accessToken}`;
     const ads = await fetchAllPages(adsUrl);
+    console.log(`[SYNC] Fetched ${ads.length} ads from Meta API`);
     if (ads.length > 0 && workspaceId && adAccountDbId) {
       const rows = ads.map((a: any) => ({
         workspace_id: workspaceId,
@@ -218,10 +236,17 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       }));
       for (let i = 0; i < rows.length; i += 500) {
-        await supabase.from('meta_ads').upsert(rows.slice(i, i + 500), {
+        const batch = rows.slice(i, i + 500);
+        const { error, data } = await supabase.from('meta_ads').upsert(batch, {
           onConflict: 'workspace_id,ad_account_id,ad_id'
-        });
+        }).select('id');
+        if (error) {
+          console.error(`[SYNC] meta_ads upsert error:`, JSON.stringify(error));
+        } else {
+          adsUpserted += data?.length || batch.length;
+        }
       }
+      console.log(`[SYNC] meta_ads: ${adsUpserted} upserted`);
     }
 
     // ─── STEP 2: Fetch INSIGHTS ───
@@ -250,6 +275,7 @@ Deno.serve(async (req) => {
 
     const insightsUrl = `https://graph.facebook.com/v21.0/${accountId}/insights?${params.toString()}`;
     const insights = await fetchAllPages(insightsUrl);
+    console.log(`[SYNC] Fetched ${insights.length} insight rows from Meta API (level=${level}, ${since} to ${until})`);
 
     // ─── STEP 3: Transform & Upsert ───
 
@@ -350,9 +376,11 @@ Deno.serve(async (req) => {
           upserted += batch.length;
         }
       }
+      console.log(`[SYNC] facts_meta_insights_daily: ${upserted}/${factRows.length} upserted`);
     }
 
     // Also write to legacy meta_records for backward compatibility
+    let legacyUpserted = 0;
     const legacyRows = insights.map((ins: any) => {
       const adName = ins.ad_name || '';
       const campaignName = ins.campaign_name || null;
@@ -407,10 +435,17 @@ Deno.serve(async (req) => {
     });
 
     for (let i = 0; i < legacyRows.length; i += 500) {
-      await supabase.from('meta_records').upsert(legacyRows.slice(i, i + 500) as any, {
+      const batch = legacyRows.slice(i, i + 500);
+      const { error } = await supabase.from('meta_records').upsert(batch as any, {
         onConflict: 'unique_key,period_key,granularity'
       });
+      if (error) {
+        console.error(`[SYNC] meta_records upsert error:`, JSON.stringify(error));
+      } else {
+        legacyUpserted += batch.length;
+      }
     }
+    console.log(`[SYNC] meta_records (legacy): ${legacyUpserted}/${legacyRows.length} upserted`);
 
     // ─── STEP 4: Update sync tracking ───
 
@@ -431,12 +466,22 @@ Deno.serve(async (req) => {
     }
 
     const totalEntities = campaigns.length + adsets.length + ads.length;
+    const summary = {
+      campaigns: { fetched: campaigns.length, upserted: campaignsUpserted },
+      adsets: { fetched: adsets.length, upserted: adsetsUpserted },
+      ads: { fetched: ads.length, upserted: adsUpserted },
+      insights: { fetched: insights.length, upserted },
+      legacy_records: { upserted: legacyUpserted },
+    };
+    console.log(`[SYNC] ✅ COMPLETE:`, JSON.stringify(summary));
+
     return new Response(
       JSON.stringify({
         success: true,
         records: upserted,
         entities: totalEntities,
         insights_fetched: insights.length,
+        details: summary,
         message: `${upserted} insights + ${totalEntities} entities sincronizados`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
