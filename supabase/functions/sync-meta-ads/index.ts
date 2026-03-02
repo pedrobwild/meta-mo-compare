@@ -286,10 +286,8 @@ Deno.serve(async (req) => {
       'actions', 'action_values', 'cost_per_action_type',
       'inline_link_click_ctr', 'cost_per_inline_link_click',
       'website_purchase_roas',
-      // Meta 2026: ThruPlay replaces 10-second views
-      'video_thru_play_actions',
-      // Meta 2026: 2-second continuous views (new standard)
-      'video_continuous_2_sec_watched_actions',
+      // Video metrics (standard fields)
+      'video_avg_time_watched_actions',
     ].join(',');
 
     const params = new URLSearchParams({
