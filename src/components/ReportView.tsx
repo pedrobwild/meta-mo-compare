@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useAppState, useFilteredRecords } from '@/lib/store';
 import {
   aggregateMetrics,
@@ -15,12 +15,20 @@ import { VERTICALS, DEFAULT_VERTICAL, getBenchmarkStatus } from '@/lib/benchmark
 import { explainChange } from '@/lib/metrics/explain';
 import { aggregateInsights, type InsightRow } from '@/lib/metrics/aggregate';
 import { generateRecommendations } from '@/lib/alerts/engine';
-import { FileText, Download, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, ArrowDown, ArrowUp, Minus, Lightbulb, MessageSquare } from 'lucide-react';
+import { FileText, Download, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, ArrowDown, ArrowUp, Minus, Lightbulb, MessageSquare, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { MetaRecord } from '@/lib/types';
+
+type AINarrative = {
+  o_que_mudou: string;
+  por_que: string;
+  o_que_faremos: string;
+};
 
 function toInsightRow(records: MetaRecord[]): InsightRow[] {
   return records.map(r => ({
@@ -39,6 +47,8 @@ function toInsightRow(records: MetaRecord[]): InsightRow[] {
 export default function ReportView() {
   const { state } = useAppState();
   const { current, previous } = useFilteredRecords();
+  const [aiNarrative, setAiNarrative] = useState<AINarrative | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const report = useMemo(() => {
     if (current.length === 0) return null;
@@ -47,11 +57,9 @@ export default function ReportView() {
     const pm = previous.length > 0 ? aggregateMetrics(previous) : null;
     const rows = groupByLevel(current, previous, 'campaign', '', false);
 
-    // ─── Metrics Layer aggregation for explain ───
     const currentAgg = aggregateInsights(toInsightRow(current));
     const previousAgg = previous.length > 0 ? aggregateInsights(toInsightRow(previous)) : null;
 
-    // ─── "O que mudou" — Explain key metrics ───
     const keyMetrics = ['cpa_lead', 'cpc_link', 'roas', 'cpm'];
     const explanations = previousAgg
       ? keyMetrics
@@ -60,7 +68,6 @@ export default function ReportView() {
           .sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))
       : [];
 
-    // ─── "O que faremos" — Auto-generated action plan ───
     const autoRecs = generateRecommendations(currentAgg, previousAgg);
 
     const highlights: { positive: string[]; negative: string[] } = { positive: [], negative: [] };
@@ -119,8 +126,79 @@ export default function ReportView() {
       cpa: row.metrics.cost_per_result,
     }));
 
-    return { summary, highlights, recommendations, cm, pm, periodLabel, compLabel, rows, verdicts, explanations, autoRecs };
+    // Top 5 campaigns for context
+    const top5 = [...rows]
+      .sort((a, b) => b.metrics.spend_brl - a.metrics.spend_brl)
+      .slice(0, 5)
+      .map(r => ({
+        name: r.name,
+        spend: r.metrics.spend_brl,
+        results: r.metrics.results,
+        cpa: r.metrics.cost_per_result,
+        ctr: r.metrics.ctr_link,
+        impressions: r.metrics.impressions,
+      }));
+
+    return { summary, highlights, recommendations, cm, pm, periodLabel, compLabel, rows, verdicts, explanations, autoRecs, top5 };
   }, [current, previous, state]);
+
+  const generateAINarrative = async () => {
+    if (!report) return;
+    setIsGenerating(true);
+    try {
+      const metricsContext = {
+        periodo: report.periodLabel,
+        periodo_comparacao: report.compLabel,
+        metricas_atuais: {
+          investimento: report.cm.spend_brl,
+          impressoes: report.cm.impressions,
+          cliques_link: report.cm.link_clicks,
+          resultados: report.cm.results,
+          cpa: report.cm.cost_per_result,
+          ctr_link: report.cm.ctr_link,
+          cpc_link: report.cm.cpc_link,
+          cpm: report.cm.cpm,
+          frequencia: report.cm.frequency,
+          lpv_rate: report.cm.lpv_rate,
+          landing_page_views: report.cm.landing_page_views,
+        },
+        metricas_anteriores: report.pm ? {
+          investimento: report.pm.spend_brl,
+          impressoes: report.pm.impressions,
+          cliques_link: report.pm.link_clicks,
+          resultados: report.pm.results,
+          cpa: report.pm.cost_per_result,
+          ctr_link: report.pm.ctr_link,
+          cpc_link: report.pm.cpc_link,
+          cpm: report.pm.cpm,
+          frequencia: report.pm.frequency,
+        } : null,
+        top5_campanhas: report.top5,
+        destaques_positivos: report.highlights.positive,
+        pontos_atencao: report.highlights.negative,
+        variacoes: report.explanations.map(e => ({
+          metrica: e.targetLabel,
+          variacao_pct: e.changePercent,
+          narrativa: e.narrative,
+        })),
+      };
+
+      const { data, error } = await supabase.functions.invoke('ai-report-narrative', {
+        body: { metricsContext },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setAiNarrative(data as AINarrative);
+      toast.success('Narrativa gerada com sucesso!');
+    } catch (err: any) {
+      console.error('AI narrative error:', err);
+      toast.error(err.message || 'Erro ao gerar narrativa');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const exportPDF = () => {
     if (!report) return;
@@ -143,45 +221,71 @@ export default function ReportView() {
     doc.text(summaryLines, 14, y);
     y += summaryLines.length * 5 + 5;
 
-    // ─── "O que mudou" section in PDF ───
-    if (report.explanations.length > 0) {
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('O que mudou', 14, y);
-      y += 6;
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      report.explanations.forEach(exp => {
-        const lines = doc.splitTextToSize(exp.narrative, 180);
+    // ─── AI Narrative sections (if generated) ───
+    if (aiNarrative) {
+      const sections = [
+        { title: 'O que mudou (Análise IA)', content: aiNarrative.o_que_mudou },
+        { title: 'Por quê (Análise IA)', content: aiNarrative.por_que },
+        { title: 'O que faremos (Análise IA)', content: aiNarrative.o_que_faremos },
+      ];
+
+      for (const section of sections) {
+        if (y > 240) { doc.addPage(); y = 15; }
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 100, 200);
+        doc.text(section.title, 14, y);
+        y += 6;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0);
+        const lines = doc.splitTextToSize(section.content, 180);
         doc.text(lines, 14, y);
-        y += lines.length * 4 + 3;
-      });
-      y += 3;
+        y += lines.length * 4 + 6;
+      }
+    } else {
+      // Fallback: rule-based sections
+      if (report.explanations.length > 0) {
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('O que mudou', 14, y);
+        y += 6;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        report.explanations.forEach(exp => {
+          const lines = doc.splitTextToSize(exp.narrative, 180);
+          doc.text(lines, 14, y);
+          y += lines.length * 4 + 3;
+        });
+        y += 3;
+      }
+
+      if (report.autoRecs.length > 0) {
+        if (y > 250) { doc.addPage(); y = 15; }
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('O que faremos', 14, y);
+        y += 6;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        report.autoRecs.forEach((rec, i) => {
+          const title = `${i + 1}. ${rec.title}`;
+          doc.text(title, 14, y);
+          y += 4;
+          const whyLines = doc.splitTextToSize(`  Por quê: ${rec.why}`, 175);
+          doc.text(whyLines, 14, y);
+          y += whyLines.length * 4;
+          const whatLines = doc.splitTextToSize(`  Ação: ${rec.what_to_do}`, 175);
+          doc.text(whatLines, 14, y);
+          y += whatLines.length * 4 + 2;
+        });
+        y += 3;
+      }
     }
 
-    // ─── "O que faremos" section in PDF ───
-    if (report.autoRecs.length > 0) {
-      if (y > 250) { doc.addPage(); y = 15; }
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('O que faremos', 14, y);
-      y += 6;
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      report.autoRecs.forEach((rec, i) => {
-        const title = `${i + 1}. ${rec.title}`;
-        doc.text(title, 14, y);
-        y += 4;
-        const whyLines = doc.splitTextToSize(`  Por quê: ${rec.why}`, 175);
-        doc.text(whyLines, 14, y);
-        y += whyLines.length * 4;
-        const whatLines = doc.splitTextToSize(`  Ação: ${rec.what_to_do}`, 175);
-        doc.text(whatLines, 14, y);
-        y += whatLines.length * 4 + 2;
-      });
-      y += 3;
-    }
-
+    // ─── KPIs table ───
+    if (y > 240) { doc.addPage(); y = 15; }
+    doc.setTextColor(0);
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.text('KPIs', 14, y);
@@ -211,6 +315,36 @@ export default function ReportView() {
 
     y = (doc as any).lastAutoTable.finalY + 8;
 
+    // ─── Top 5 Campaigns ───
+    if (report.top5.length > 0) {
+      if (y > 230) { doc.addPage(); y = 15; }
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Top 5 Campanhas por Investimento', 14, y);
+      y += 2;
+
+      const top5Data = report.top5.map(c => [
+        c.name.length > 35 ? c.name.slice(0, 35) + '…' : c.name,
+        `R$${c.spend.toFixed(2)}`,
+        `${c.results}`,
+        `R$${c.cpa.toFixed(2)}`,
+        `${c.ctr.toFixed(2)}%`,
+      ]);
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Campanha', 'Invest.', 'Result.', 'CPA', 'CTR']],
+        body: top5Data,
+        theme: 'grid',
+        headStyles: { fillColor: [30, 144, 255], textColor: 255, fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        margin: { left: 14, right: 14 },
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // ─── Verdicts ───
     if (report.verdicts.length > 0) {
       if (y > 230) { doc.addPage(); y = 15; }
       doc.setFontSize(12);
@@ -240,6 +374,7 @@ export default function ReportView() {
       y = (doc as any).lastAutoTable.finalY + 8;
     }
 
+    // ─── Recommendations ───
     if (y > 250) { doc.addPage(); y = 15; }
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
@@ -265,9 +400,15 @@ export default function ReportView() {
           Relatório — {report.periodLabel}
           {report.compLabel && <span className="text-muted-foreground font-normal text-sm">vs {report.compLabel}</span>}
         </h2>
-        <Button size="sm" onClick={exportPDF}>
-          <Download className="h-4 w-4 mr-1" /> PDF
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={generateAINarrative} disabled={isGenerating}>
+            {isGenerating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+            {aiNarrative ? 'Regerar IA' : 'Gerar Narrativa IA'}
+          </Button>
+          <Button size="sm" onClick={exportPDF}>
+            <Download className="h-4 w-4 mr-1" /> PDF
+          </Button>
+        </div>
       </div>
 
       {/* Resumo Executivo */}
@@ -276,8 +417,27 @@ export default function ReportView() {
         <p className="text-foreground leading-relaxed">{report.summary}</p>
       </div>
 
-      {/* ─── O QUE MUDOU ─── */}
-      {report.explanations.length > 0 && (
+      {/* ─── AI NARRATIVE SECTIONS ─── */}
+      {aiNarrative && (
+        <div className="space-y-4">
+          {[
+            { title: 'O que mudou', content: aiNarrative.o_que_mudou, icon: <MessageSquare className="h-4 w-4" />, borderColor: 'border-l-primary/50', titleColor: 'text-primary' },
+            { title: 'Por quê', content: aiNarrative.por_que, icon: <Lightbulb className="h-4 w-4" />, borderColor: 'border-l-amber-500/50', titleColor: 'text-amber-400' },
+            { title: 'O que faremos', content: aiNarrative.o_que_faremos, icon: <CheckCircle2 className="h-4 w-4" />, borderColor: 'border-l-emerald-500/50', titleColor: 'text-emerald-400' },
+          ].map((section, idx) => (
+            <div key={idx} className={`glass-card p-5 border-l-2 ${section.borderColor}`}>
+              <h3 className={`text-sm font-medium ${section.titleColor} mb-3 uppercase tracking-wider flex items-center gap-2`}>
+                {section.icon} {section.title}
+                <Badge variant="outline" className="text-[10px] ml-auto"><Sparkles className="h-3 w-3 mr-1" />IA</Badge>
+              </h3>
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{section.content}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ─── RULE-BASED: O QUE MUDOU (show when no AI) ─── */}
+      {!aiNarrative && report.explanations.length > 0 && (
         <div className="glass-card p-5 border-l-2 border-l-primary/50">
           <h3 className="text-sm font-medium text-primary mb-4 uppercase tracking-wider flex items-center gap-2">
             <MessageSquare className="h-4 w-4" /> O que mudou
@@ -292,7 +452,6 @@ export default function ReportView() {
                   </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">{exp.narrative}</p>
-                {/* Driver waterfall */}
                 <div className="flex flex-wrap gap-2 mt-1">
                   {exp.drivers.slice(0, 4).map(d => (
                     <div key={d.key} className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/20 border border-border/20 text-xs">
@@ -353,8 +512,8 @@ export default function ReportView() {
         </div>
       </div>
 
-      {/* ─── O QUE FAREMOS ─── */}
-      {report.autoRecs.length > 0 && (
+      {/* ─── RULE-BASED: O QUE FAREMOS (show when no AI) ─── */}
+      {!aiNarrative && report.autoRecs.length > 0 && (
         <div className="glass-card p-5 border-l-2 border-l-amber-500/50">
           <h3 className="text-sm font-medium text-amber-400 mb-4 uppercase tracking-wider flex items-center gap-2">
             <Lightbulb className="h-4 w-4" /> O que faremos
