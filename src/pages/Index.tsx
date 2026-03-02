@@ -38,6 +38,7 @@ import CreativesView from '@/components/CreativesView';
 import LeadsView from '@/components/LeadsView';
 import InstagramView from '@/components/InstagramView';
 import ExperimentsView from '@/components/ExperimentsView';
+import UtmBuilderView from '@/components/UtmBuilderView';
 import Auth from '@/pages/Auth';
 
 function EmptyState() {
@@ -200,6 +201,9 @@ function DashboardContent() {
               )}
               {activeTab === 'experiments' && (
                 <ViewContainer key="experiments"><ExperimentsView /></ViewContainer>
+              )}
+              {activeTab === 'utm-builder' && (
+                <ViewContainer key="utm-builder"><UtmBuilderView /></ViewContainer>
               )}
               {activeTab === 'health' && (
                 <ViewContainer key="health"><DataHealthView /></ViewContainer>
