@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.analyze-funnel]
 verify_jwt = false
+
+[functions.run-health-checks]
+verify_jwt = false

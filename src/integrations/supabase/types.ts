@@ -586,6 +586,106 @@ export type Database = {
           },
         ]
       }
+      data_gaps: {
+        Row: {
+          affected_records: number
+          campaign_id: string | null
+          campaign_name: string | null
+          date_from: string | null
+          date_to: string | null
+          detected_at: string
+          gap_type: string
+          id: string
+          notes: string | null
+          severity: string
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          affected_records?: number
+          campaign_id?: string | null
+          campaign_name?: string | null
+          date_from?: string | null
+          date_to?: string | null
+          detected_at?: string
+          gap_type?: string
+          id?: string
+          notes?: string | null
+          severity?: string
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          affected_records?: number
+          campaign_id?: string | null
+          campaign_name?: string | null
+          date_from?: string | null
+          date_to?: string | null
+          detected_at?: string
+          gap_type?: string
+          id?: string
+          notes?: string | null
+          severity?: string
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_gaps_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_health_checks: {
+        Row: {
+          auto_resolved: boolean
+          check_type: string
+          checked_at: string
+          entity: string
+          id: string
+          issue_description: string
+          recommendation: string
+          resolved_at: string | null
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          auto_resolved?: boolean
+          check_type?: string
+          checked_at?: string
+          entity?: string
+          id?: string
+          issue_description?: string
+          recommendation?: string
+          resolved_at?: string | null
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          auto_resolved?: boolean
+          check_type?: string
+          checked_at?: string
+          entity?: string
+          id?: string
+          issue_description?: string
+          recommendation?: string
+          resolved_at?: string | null
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_health_checks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       decisions_log: {
         Row: {
           action_type: string
