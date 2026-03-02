@@ -608,6 +608,194 @@ export type Database = {
           },
         ]
       }
+      ig_conversations: {
+        Row: {
+          conversation_id: string
+          id: string
+          participant_id: string | null
+          participant_name: string | null
+          participant_username: string | null
+          updated_at: string
+          updated_time: string | null
+          workspace_id: string
+        }
+        Insert: {
+          conversation_id: string
+          id?: string
+          participant_id?: string | null
+          participant_name?: string | null
+          participant_username?: string | null
+          updated_at?: string
+          updated_time?: string | null
+          workspace_id: string
+        }
+        Update: {
+          conversation_id?: string
+          id?: string
+          participant_id?: string | null
+          participant_name?: string | null
+          participant_username?: string | null
+          updated_at?: string
+          updated_time?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ig_conversations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ig_media: {
+        Row: {
+          caption: string | null
+          comments_count: number | null
+          id: string
+          ig_user_id: string
+          like_count: number | null
+          media_id: string
+          media_type: string | null
+          media_url: string | null
+          permalink: string | null
+          thumbnail_url: string | null
+          timestamp: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          caption?: string | null
+          comments_count?: number | null
+          id?: string
+          ig_user_id: string
+          like_count?: number | null
+          media_id: string
+          media_type?: string | null
+          media_url?: string | null
+          permalink?: string | null
+          thumbnail_url?: string | null
+          timestamp?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          caption?: string | null
+          comments_count?: number | null
+          id?: string
+          ig_user_id?: string
+          like_count?: number | null
+          media_id?: string
+          media_type?: string | null
+          media_url?: string | null
+          permalink?: string | null
+          thumbnail_url?: string | null
+          timestamp?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ig_media_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ig_media_insights: {
+        Row: {
+          engagement: number | null
+          id: string
+          impressions: number | null
+          media_id: string
+          reach: number | null
+          saved: number | null
+          shares: number | null
+          updated_at: string
+          video_views: number | null
+          workspace_id: string
+        }
+        Insert: {
+          engagement?: number | null
+          id?: string
+          impressions?: number | null
+          media_id: string
+          reach?: number | null
+          saved?: number | null
+          shares?: number | null
+          updated_at?: string
+          video_views?: number | null
+          workspace_id: string
+        }
+        Update: {
+          engagement?: number | null
+          id?: string
+          impressions?: number | null
+          media_id?: string
+          reach?: number | null
+          saved?: number | null
+          shares?: number | null
+          updated_at?: string
+          video_views?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ig_media_insights_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ig_messages: {
+        Row: {
+          conversation_id: string
+          created_time: string | null
+          id: string
+          is_from_page: boolean | null
+          message_id: string
+          message_text: string | null
+          sender_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_time?: string | null
+          id?: string
+          is_from_page?: boolean | null
+          message_id: string
+          message_text?: string | null
+          sender_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_time?: string | null
+          id?: string
+          is_from_page?: boolean | null
+          message_id?: string
+          message_text?: string | null
+          sender_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ig_messages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_quality: {
         Row: {
           ad_key: string | null
