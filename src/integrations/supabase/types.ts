@@ -356,6 +356,45 @@ export type Database = {
           },
         ]
       }
+      benchmarks: {
+        Row: {
+          id: string
+          metric: string
+          platform: string
+          segment: string
+          source: string | null
+          unit: string
+          updated_at: string
+          value_high: number
+          value_low: number
+          value_mid: number
+        }
+        Insert: {
+          id?: string
+          metric?: string
+          platform?: string
+          segment?: string
+          source?: string | null
+          unit?: string
+          updated_at?: string
+          value_high?: number
+          value_low?: number
+          value_mid?: number
+        }
+        Update: {
+          id?: string
+          metric?: string
+          platform?: string
+          segment?: string
+          source?: string | null
+          unit?: string
+          updated_at?: string
+          value_high?: number
+          value_low?: number
+          value_mid?: number
+        }
+        Relationships: []
+      }
       budget_simulations: {
         Row: {
           analise_claude_json: Json | null
@@ -2441,6 +2480,41 @@ export type Database = {
             foreignKeyName: "workspace_memberships_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_settings: {
+        Row: {
+          ciclo_vendas_dias: number | null
+          id: string
+          segment: string
+          ticket_medio: number | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          ciclo_vendas_dias?: number | null
+          id?: string
+          segment?: string
+          ticket_medio?: number | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          ciclo_vendas_dias?: number | null
+          id?: string
+          segment?: string
+          ticket_medio?: number | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_settings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
