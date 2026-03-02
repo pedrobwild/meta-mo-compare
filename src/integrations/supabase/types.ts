@@ -886,6 +886,122 @@ export type Database = {
           },
         ]
       }
+      meta_lead_forms: {
+        Row: {
+          ad_account_id: string | null
+          created_time: string | null
+          form_id: string
+          id: string
+          name: string | null
+          page_id: string | null
+          status: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          ad_account_id?: string | null
+          created_time?: string | null
+          form_id: string
+          id?: string
+          name?: string | null
+          page_id?: string | null
+          status?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          ad_account_id?: string | null
+          created_time?: string | null
+          form_id?: string
+          id?: string
+          name?: string | null
+          page_id?: string | null
+          status?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_lead_forms_ad_account_id_fkey"
+            columns: ["ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "ad_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_lead_forms_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meta_leads: {
+        Row: {
+          ad_id: string | null
+          adset_id: string | null
+          campaign_id: string | null
+          created_time: string
+          field_data: Json
+          form_id: string
+          id: string
+          is_organic: boolean | null
+          lead_email: string | null
+          lead_id: string
+          lead_name: string | null
+          lead_phone: string | null
+          platform: string | null
+          raw_json: Json | null
+          synced_at: string
+          workspace_id: string
+        }
+        Insert: {
+          ad_id?: string | null
+          adset_id?: string | null
+          campaign_id?: string | null
+          created_time: string
+          field_data?: Json
+          form_id: string
+          id?: string
+          is_organic?: boolean | null
+          lead_email?: string | null
+          lead_id: string
+          lead_name?: string | null
+          lead_phone?: string | null
+          platform?: string | null
+          raw_json?: Json | null
+          synced_at?: string
+          workspace_id: string
+        }
+        Update: {
+          ad_id?: string | null
+          adset_id?: string | null
+          campaign_id?: string | null
+          created_time?: string
+          field_data?: Json
+          form_id?: string
+          id?: string
+          is_organic?: boolean | null
+          lead_email?: string | null
+          lead_id?: string
+          lead_name?: string | null
+          lead_phone?: string | null
+          platform?: string | null
+          raw_json?: Json | null
+          synced_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_leads_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meta_records: {
         Row: {
           ad_key: string

@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.sync-meta-ads]
 verify_jwt = false
+
+[functions.sync-meta-leads]
+verify_jwt = false
+
+[functions.webhook-meta-leads]
+verify_jwt = false
