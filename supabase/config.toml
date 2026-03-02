@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.ai-report-narrative]
 verify_jwt = false
+
+[functions.check-alert-rules]
+verify_jwt = false
+
+[functions.detect-anomalies]
+verify_jwt = false
