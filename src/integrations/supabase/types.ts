@@ -2337,6 +2337,83 @@ export type Database = {
           },
         ]
       }
+      utm_links: {
+        Row: {
+          base_url: string
+          conjunto: string | null
+          created_at: string
+          created_by: string | null
+          full_url: string
+          funil: string
+          id: string
+          mes_ano: string | null
+          nome_anuncio: string | null
+          objetivo: string
+          pais: string
+          platform: string
+          produto: string | null
+          publico: string | null
+          utm_campaign: string
+          utm_content: string | null
+          utm_medium: string
+          utm_source: string
+          utm_term: string | null
+          workspace_id: string
+        }
+        Insert: {
+          base_url?: string
+          conjunto?: string | null
+          created_at?: string
+          created_by?: string | null
+          full_url?: string
+          funil?: string
+          id?: string
+          mes_ano?: string | null
+          nome_anuncio?: string | null
+          objetivo?: string
+          pais?: string
+          platform?: string
+          produto?: string | null
+          publico?: string | null
+          utm_campaign?: string
+          utm_content?: string | null
+          utm_medium?: string
+          utm_source?: string
+          utm_term?: string | null
+          workspace_id: string
+        }
+        Update: {
+          base_url?: string
+          conjunto?: string | null
+          created_at?: string
+          created_by?: string | null
+          full_url?: string
+          funil?: string
+          id?: string
+          mes_ano?: string | null
+          nome_anuncio?: string | null
+          objetivo?: string
+          pais?: string
+          platform?: string
+          produto?: string | null
+          publico?: string | null
+          utm_campaign?: string
+          utm_content?: string | null
+          utm_medium?: string
+          utm_source?: string
+          utm_term?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "utm_links_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_memberships: {
         Row: {
           created_at: string
