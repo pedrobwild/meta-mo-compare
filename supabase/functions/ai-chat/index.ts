@@ -321,7 +321,81 @@ ${variacaoJson}
 Dados de funil:
 \`\`\`json
 ${funnelJson}
-\`\`\``;
+\`\`\`
+
+---
+
+## MUDANÇAS META 2026 (OBRIGATÓRIO considerar em toda análise)
+
+### API e Estrutura
+- Advantage+ é a estrutura padrão em 2026. Campanhas manuais tendem a ter desempenho inferior ao Advantage+ Audience para a maioria dos objetivos.
+- ASC e AAC legados foram descontinuados (maio/2026). Toda campanha nova usa estrutura Advantage+ unificada.
+
+### Atribuição
+- Janelas disponíveis: 7-day click / 1-day view (padrão).
+- 28-day view-through e 7-day view-through foram REMOVIDAS.
+- Nunca referenciar janelas de atribuição descontinuadas.
+
+### Métricas de Vídeo
+- ThruPlay = métrica oficial de vídeo (substituiu 10-second views).
+- ThruPlay Rate saudável: > 20%.
+- 2-second continuous views = métrica de awareness.
+
+### Segmentação
+- Advantage+ Audience = segmentação por IA (preferencial).
+- Detailed Targeting com interesses antigos foi descontinuado.
+- Campanhas com interesses obsoletos pararam de entregar em jan/2026.
+
+### Partnership Ads (novo 2026)
+- Criativos com criadores performam em média: 13% melhor em CTR e 19% melhor em CPA.
+- Ao ver criativo partnership_ad = true, considerar este contexto na análise.
+
+### Alcance
+- Métrica "reach" sendo substituída por "viewers" (medição cross-platform Facebook + Instagram).
+- A partir de junho/2026, usar "viewers" como referência.
+
+### Dados históricos
+- Máximo 13 meses para unique counts.
+- Máximo 6 meses para frequency breakdowns.
+- Nunca solicitar dados além desses limites.
+
+---
+
+## BENCHMARKS 2026 (use como referência)
+
+Meta Ads Brasil — Serviços B2B:
+- CTR feed saudável: 1.2–1.8%
+- CTR Advantage+ Audience: 1.5–2.2% (20-30% maior)
+- ThruPlay Rate: 20–35%
+- CPM médio Brasil: R$ 15–22
+- Frequência máxima prospecting (7d): 2.5
+- ROAS mínimo saudável: 2.5x
+- Partnership Ads: CPA 19% menor, CTR 13% maior
+
+---
+
+## PADRÃO UTM OBRIGATÓRIO BWILD
+
+Todo anúncio DEVE ter UTMs no padrão:
+- utm_source=meta (ou google/tiktok/youtube)
+- utm_medium=paid
+- utm_campaign=OBJETIVO|FUNIL|PAIS|PRODUTO|AAAA-MM
+- utm_content=Angulo_Formato_Versao
+- utm_term=Publico_ou_PalavraChave
+
+Se detectar lead sem UTM → alertar imediatamente.
+Regra de ouro bwild: nunca subir campanha sem UTM.
+
+---
+
+## CICLO DE VIDA DE CRIATIVOS (referência rápida)
+
+🆕 Fresh (0-3 dias): não pausar, observar
+🚀 Peaking: CTR ≥ 1.2%, CPL ≤ meta, freq ≤ 2.5 → escalar
+⚠️ Declining: CTR caiu > 20% vs média 7d → preparar substituto
+🔴 Fatigued: freq > 3.5 OU CTR < 1% por 3 dias → pausar
+
+Rotacionar 2-3 novas peças/semana para evitar fadiga.`;
 
   return basePrompt;
 }
