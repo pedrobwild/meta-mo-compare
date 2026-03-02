@@ -1,4 +1,4 @@
-import { Eye, Crosshair, ChartScatter, Activity, Calculator, FileText, History, GitBranch, Lightbulb, Cloud, RefreshCw, Trash2, BarChart3, Bell, Zap, Bot, LogOut, Users, Palette, Contact, Instagram, FlaskConical, Link2 } from 'lucide-react';
+import { Eye, Crosshair, ChartScatter, Activity, Calculator, FileText, History, GitBranch, Lightbulb, Cloud, RefreshCw, Trash2, BarChart3, Bell, Zap, Bot, LogOut, Users, Palette, Contact, Instagram, FlaskConical, Link2, Gauge } from 'lucide-react';
 import { useAppState } from '@/lib/store';
 import { useWorkspace } from '@/lib/workspace';
 import MetaSyncButton from './MetaSyncButton';
@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
-export type Tab = 'executive' | 'tactical' | 'diagnostic' | 'funnel' | 'funnel-real' | 'leads' | 'instagram' | 'creatives' | 'simulator' | 'report' | 'decisions' | 'experiments' | 'utm-builder' | 'health' | 'missing' | 'alerts' | 'actions' | 'ai';
+export type Tab = 'executive' | 'tactical' | 'diagnostic' | 'funnel' | 'funnel-real' | 'leads' | 'instagram' | 'creatives' | 'simulator' | 'report' | 'decisions' | 'experiments' | 'utm-builder' | 'benchmarks' | 'health' | 'missing' | 'alerts' | 'actions' | 'ai';
 
 const NAV_GROUPS = [
   {
@@ -56,6 +56,7 @@ const NAV_GROUPS = [
   {
     label: 'Sistema',
     items: [
+      { key: 'benchmarks' as Tab, label: 'Benchmarks', icon: Gauge, description: 'Referências por segmento' },
       { key: 'health' as Tab, label: 'Saúde', icon: GitBranch, description: 'Integridade dos dados' },
       { key: 'missing' as Tab, label: 'Lacunas', icon: Lightbulb, description: 'Dados ausentes' },
     ],
