@@ -9,17 +9,24 @@ const corsHeaders = {
 
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
-async function fetchWithRetry(url: string, retries = 3, backoff = 2000): Promise<Response> {
+async function fetchWithRetry(url: string, retries = 5, backoff = 3000): Promise<Response> {
   for (let i = 0; i < retries; i++) {
     const res = await fetch(url);
     if (res.ok) return res;
-    if (res.status === 429 || res.status >= 500) {
+
+    const errorText = await res.text();
+
+    // Retry on rate-limit, server errors, or Meta transient errors (code 2)
+    const isRetryable = res.status === 429 || res.status >= 500 ||
+      (res.status === 400 && (errorText.includes('"code":2') || errorText.includes('temporarily unavailable')));
+
+    if (isRetryable && i < retries - 1) {
       const wait = backoff * Math.pow(2, i);
-      console.log(`Rate limited or server error (${res.status}), retrying in ${wait}ms...`);
+      console.log(`Retryable error (${res.status}), attempt ${i + 1}/${retries}, retrying in ${wait}ms...`);
       await sleep(wait);
       continue;
     }
-    const errorText = await res.text();
+
     throw new Error(`Meta API error: ${res.status} - ${errorText}`);
   }
   throw new Error('Max retries exceeded');
