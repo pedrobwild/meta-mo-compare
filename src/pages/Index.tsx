@@ -41,6 +41,7 @@ import InstagramView from '@/components/InstagramView';
 import ExperimentsView from '@/components/ExperimentsView';
 import UtmBuilderView from '@/components/UtmBuilderView';
 import BenchmarksView from '@/components/BenchmarksView';
+import PersonaAudienceView from '@/components/PersonaAudienceView';
 import Auth from '@/pages/Auth';
 
 function EmptyState() {
@@ -225,6 +226,9 @@ function DashboardContent() {
               )}
               {activeTab === 'ai' && (
                 <ViewContainer key="ai"><AIRecommendationsPanel /></ViewContainer>
+              )}
+              {activeTab === 'personas' && (
+                <ViewContainer key="personas"><PersonaAudienceView /></ViewContainer>
               )}
             </AnimatePresence>
           </main>

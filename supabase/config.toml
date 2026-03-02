@@ -47,3 +47,12 @@ verify_jwt = false
 
 [functions.run-health-checks]
 verify_jwt = false
+
+[functions.sync-audience-demographics]
+verify_jwt = false
+
+[functions.generate-personas]
+verify_jwt = false
+
+[functions.analyze-persona]
+verify_jwt = false

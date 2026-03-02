@@ -1,7 +1,7 @@
 import {
   Eye, Crosshair, ChartScatter, Activity, Calculator, FileText,
   History, GitBranch, Lightbulb, BarChart3, Bell, Zap, Bot, LogOut,
-  Users, Palette, Contact, Instagram, FlaskConical, Link2, Gauge, Search
+  Users, Palette, Contact, Instagram, FlaskConical, Link2, Gauge, Search, UserCircle
 } from 'lucide-react';
 import { useAppState } from '@/lib/store';
 import { useWorkspace } from '@/lib/workspace';
@@ -22,7 +22,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
-export type Tab = 'executive' | 'tactical' | 'diagnostic' | 'funnel' | 'funnel-real' | 'leads' | 'instagram' | 'creatives' | 'simulator' | 'report' | 'decisions' | 'experiments' | 'utm-builder' | 'benchmarks' | 'health' | 'missing' | 'alerts' | 'actions' | 'ai';
+export type Tab = 'executive' | 'tactical' | 'diagnostic' | 'funnel' | 'funnel-real' | 'leads' | 'instagram' | 'creatives' | 'simulator' | 'report' | 'decisions' | 'experiments' | 'utm-builder' | 'benchmarks' | 'health' | 'missing' | 'alerts' | 'actions' | 'ai' | 'personas';
 
 const NAV_GROUPS = [
   {
@@ -32,6 +32,7 @@ const NAV_GROUPS = [
       { key: 'tactical' as Tab, label: 'Tático', icon: Crosshair },
       { key: 'diagnostic' as Tab, label: 'Diagnóstico', icon: Search },
       { key: 'creatives' as Tab, label: 'Criativos', icon: Palette },
+      { key: 'personas' as Tab, label: 'Personas', icon: UserCircle },
       { key: 'alerts' as Tab, label: 'Alertas', icon: Bell },
       { key: 'actions' as Tab, label: 'Ações', icon: Zap },
       { key: 'ai' as Tab, label: 'IA Analyst', icon: Bot },

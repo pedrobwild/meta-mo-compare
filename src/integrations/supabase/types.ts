@@ -321,6 +321,180 @@ export type Database = {
           },
         ]
       }
+      audience_demographics: {
+        Row: {
+          age_range: string
+          campaign_id: string | null
+          city: string
+          clicks: number
+          conversions: number
+          country: string
+          created_at: string
+          date: string
+          gender: string
+          id: string
+          impressions: number
+          leads: number
+          mql: number
+          region: string
+          revenue: number
+          source: string
+          spend: number
+          sql_count: number
+          workspace_id: string
+        }
+        Insert: {
+          age_range?: string
+          campaign_id?: string | null
+          city?: string
+          clicks?: number
+          conversions?: number
+          country?: string
+          created_at?: string
+          date: string
+          gender?: string
+          id?: string
+          impressions?: number
+          leads?: number
+          mql?: number
+          region?: string
+          revenue?: number
+          source?: string
+          spend?: number
+          sql_count?: number
+          workspace_id: string
+        }
+        Update: {
+          age_range?: string
+          campaign_id?: string | null
+          city?: string
+          clicks?: number
+          conversions?: number
+          country?: string
+          created_at?: string
+          date?: string
+          gender?: string
+          id?: string
+          impressions?: number
+          leads?: number
+          mql?: number
+          region?: string
+          revenue?: number
+          source?: string
+          spend?: number
+          sql_count?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audience_demographics_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audience_device_data: {
+        Row: {
+          clicks: number
+          cpl: number
+          created_at: string
+          ctr: number
+          date: string
+          device_type: string
+          id: string
+          impressions: number
+          leads: number
+          placement: string
+          platform: string
+          workspace_id: string
+        }
+        Insert: {
+          clicks?: number
+          cpl?: number
+          created_at?: string
+          ctr?: number
+          date: string
+          device_type?: string
+          id?: string
+          impressions?: number
+          leads?: number
+          placement?: string
+          platform?: string
+          workspace_id: string
+        }
+        Update: {
+          clicks?: number
+          cpl?: number
+          created_at?: string
+          ctr?: number
+          date?: string
+          device_type?: string
+          id?: string
+          impressions?: number
+          leads?: number
+          placement?: string
+          platform?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audience_device_data_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audience_interests: {
+        Row: {
+          cpl: number
+          created_at: string
+          ctr: number
+          date: string
+          id: string
+          interest_category: string
+          interest_name: string
+          mql_rate: number
+          reach: number
+          workspace_id: string
+        }
+        Insert: {
+          cpl?: number
+          created_at?: string
+          ctr?: number
+          date: string
+          id?: string
+          interest_category?: string
+          interest_name?: string
+          mql_rate?: number
+          reach?: number
+          workspace_id: string
+        }
+        Update: {
+          cpl?: number
+          created_at?: string
+          ctr?: number
+          date?: string
+          id?: string
+          interest_category?: string
+          interest_name?: string
+          mql_rate?: number
+          reach?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audience_interests_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -2193,6 +2367,89 @@ export type Database = {
           },
           {
             foreignKeyName: "optimization_log_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      persona_profiles: {
+        Row: {
+          age_range: string
+          avg_close_rate: number
+          avg_cpl: number
+          avg_deal_value: number
+          avg_mql_rate: number
+          avg_sql_rate: number
+          best_day_of_week: string | null
+          best_hour_of_day: number | null
+          best_performing_creative_angle: string | null
+          best_performing_placement: string | null
+          created_at: string
+          description: string
+          gender: string
+          id: string
+          name: string
+          roas_real: number
+          top_cities: string[]
+          top_interests: string[]
+          total_leads: number
+          total_revenue: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          age_range?: string
+          avg_close_rate?: number
+          avg_cpl?: number
+          avg_deal_value?: number
+          avg_mql_rate?: number
+          avg_sql_rate?: number
+          best_day_of_week?: string | null
+          best_hour_of_day?: number | null
+          best_performing_creative_angle?: string | null
+          best_performing_placement?: string | null
+          created_at?: string
+          description?: string
+          gender?: string
+          id?: string
+          name: string
+          roas_real?: number
+          top_cities?: string[]
+          top_interests?: string[]
+          total_leads?: number
+          total_revenue?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          age_range?: string
+          avg_close_rate?: number
+          avg_cpl?: number
+          avg_deal_value?: number
+          avg_mql_rate?: number
+          avg_sql_rate?: number
+          best_day_of_week?: string | null
+          best_hour_of_day?: number | null
+          best_performing_creative_angle?: string | null
+          best_performing_placement?: string | null
+          created_at?: string
+          description?: string
+          gender?: string
+          id?: string
+          name?: string
+          roas_real?: number
+          top_cities?: string[]
+          top_interests?: string[]
+          total_leads?: number
+          total_revenue?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "persona_profiles_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
