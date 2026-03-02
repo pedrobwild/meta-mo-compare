@@ -235,6 +235,65 @@ export type Database = {
           },
         ]
       }
+      budget_simulations: {
+        Row: {
+          analise_claude_json: Json | null
+          budget_atual: number
+          budget_simulado: number
+          cenario_recomendado: string | null
+          cenarios_json: Json
+          created_at: string
+          id: string
+          metricas_historicas_json: Json | null
+          objetivo: string
+          periodo_dias: number
+          resultado_real_json: Json | null
+          user_id: string | null
+          valor_objetivo: number | null
+          workspace_id: string
+        }
+        Insert: {
+          analise_claude_json?: Json | null
+          budget_atual?: number
+          budget_simulado?: number
+          cenario_recomendado?: string | null
+          cenarios_json?: Json
+          created_at?: string
+          id?: string
+          metricas_historicas_json?: Json | null
+          objetivo?: string
+          periodo_dias?: number
+          resultado_real_json?: Json | null
+          user_id?: string | null
+          valor_objetivo?: number | null
+          workspace_id: string
+        }
+        Update: {
+          analise_claude_json?: Json | null
+          budget_atual?: number
+          budget_simulado?: number
+          cenario_recomendado?: string | null
+          cenarios_json?: Json
+          created_at?: string
+          id?: string
+          metricas_historicas_json?: Json | null
+          objetivo?: string
+          periodo_dias?: number
+          resultado_real_json?: Json | null
+          user_id?: string | null
+          valor_objetivo?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_simulations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       connectors: {
         Row: {
           config_json: Json | null
