@@ -47,12 +47,16 @@ function useMetricsContext() {
   const topCampanhas = Array.from(campaignMap.values())
     .map(c => ({
       ...c,
-      ctr: c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0,
-      cpm: c.impressions > 0 ? (c.spend / c.impressions) * 1000 : 0,
-      cpa: c.results > 0 ? c.spend / c.results : 0,
+      ctr: c.impressions > 0 ? +(c.clicks / c.impressions * 100).toFixed(2) : 0,
+      cpm: c.impressions > 0 ? +(c.spend / c.impressions * 1000).toFixed(2) : 0,
+      cpa: c.results > 0 ? +(c.spend / c.results).toFixed(2) : 0,
+      roas: c.spend > 0 && c.results > 0 ? +((c.results * 1) / c.spend).toFixed(2) : 0,
     }))
     .sort((a, b) => b.spend - a.spend)
     .slice(0, 5);
+
+  // Compute account-level ROAS (if purchase_value available, approximate from results/spend)
+  const accountRoas = metrics.spend_brl > 0 ? +(metrics.results / metrics.spend_brl).toFixed(4) : 0;
 
   // Build alerts from state
   const alertas = (state as any).alertEvents?.filter((a: any) => a.status === 'open')?.slice(0, 10) || [];
@@ -72,6 +76,7 @@ function useMetricsContext() {
       cpc: metrics.cpc_link,
       ctr: metrics.ctr_link,
       cpa: metrics.cost_per_result,
+      roas: accountRoas,
       frequencia: metrics.frequency,
       lpv_rate: metrics.lpv_rate,
     },

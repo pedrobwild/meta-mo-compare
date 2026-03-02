@@ -9,10 +9,12 @@ function buildSystemPrompt(ctx: any): string {
   const periodo = ctx?.periodo || "[data_inicio] a [data_fim]";
   const campanhasJson = ctx?.campanhasAtivas ? JSON.stringify(ctx.campanhasAtivas, null, 2) : "Nenhuma campanha disponível";
   const alertasJson = ctx?.alertas ? JSON.stringify(ctx.alertas, null, 2) : "Nenhum alerta aberto";
-  const topCampanhasJson = ctx?.topCampanhas ? JSON.stringify(ctx.topCampanhas, null, 2) : "Não disponível";
   const variacaoJson = ctx?.variacao ? JSON.stringify(ctx.variacao, null, 2) : "Não disponível";
+  const totalSpend = ctx?.metricas?.investimento != null ? Number(ctx.metricas.investimento).toFixed(2) : "N/A";
+  const cpa = ctx?.metricas?.cpa != null ? Number(ctx.metricas.cpa).toFixed(2) : "N/A";
+  const roasValue = ctx?.metricas?.roas != null ? Number(ctx.metricas.roas).toFixed(2) : "N/A";
 
-  return `Você é um analista especialista em performance de mídia paga, com foco em Meta Ads (Facebook e Instagram). Você trabalha para a agência bwild e analisa dados em tempo real do Gerenciador de Anúncios.
+  const basePrompt = `Você é um analista especialista em performance de mídia paga, com foco em Meta Ads (Facebook e Instagram). Você trabalha para a agência bwild e analisa dados em tempo real do Gerenciador de Anúncios.
 
 ## SEU PAPEL
 
@@ -23,21 +25,6 @@ Você é objetivo, direto e orientado a resultados. Não dá respostas genérica
 - Período analisado: ${periodo}
 - Comparativo com período anterior: variação % de cada KPI
 ${variacaoJson !== "Não disponível" ? `\`\`\`json\n${variacaoJson}\n\`\`\`` : "Sem dados de comparação"}
-
-- Campanhas ativas (nome, status, orçamento, ROAS, CPA, CTR, Conversões, Impressões, Cliques, Investimento):
-\`\`\`json
-${campanhasJson}
-\`\`\`
-
-- Top campanhas por investimento:
-\`\`\`json
-${topCampanhasJson}
-\`\`\`
-
-- Alertas abertos (métrica, threshold, valor atual):
-\`\`\`json
-${alertasJson}
-\`\`\`
 
 ## COMO RESPONDER
 
@@ -83,7 +70,29 @@ Quando o usuário mencionar um módulo, entenda o contexto:
 - Sempre termine com uma ação clara e objetiva
 
 ## IDIOMA
-Sempre responda em português brasileiro.`;
+Sempre responda em português brasileiro.
+
+## DADOS ATUAIS DA CONTA
+
+Período: ${periodo}
+
+Investimento total: R$ ${totalSpend}
+
+ROAS médio: ${roasValue}
+
+CPA médio: R$ ${cpa}
+
+Campanhas ativas:
+\`\`\`json
+${campanhasJson}
+\`\`\`
+
+Alertas abertos:
+\`\`\`json
+${alertasJson}
+\`\`\``;
+
+  return basePrompt;
 }
 
 serve(async (req) => {
