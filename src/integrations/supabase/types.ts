@@ -200,6 +200,62 @@ export type Database = {
           },
         ]
       }
+      anomaly_events: {
+        Row: {
+          detected_at: string
+          deviation_pct: number
+          entity_id: string
+          entity_name: string | null
+          entity_type: string
+          id: string
+          metric: string
+          resolved_at: string | null
+          severity: string
+          status: string
+          value_current: number
+          value_expected: number
+          workspace_id: string
+        }
+        Insert: {
+          detected_at?: string
+          deviation_pct?: number
+          entity_id?: string
+          entity_name?: string | null
+          entity_type?: string
+          id?: string
+          metric: string
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          value_current?: number
+          value_expected?: number
+          workspace_id: string
+        }
+        Update: {
+          detected_at?: string
+          deviation_pct?: number
+          entity_id?: string
+          entity_name?: string | null
+          entity_type?: string
+          id?: string
+          metric?: string
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          value_current?: number
+          value_expected?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anomaly_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
