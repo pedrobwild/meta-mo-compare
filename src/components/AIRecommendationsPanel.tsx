@@ -93,11 +93,11 @@ export default function AIRecommendationsPanel() {
   }, [current, previous]);
 
   return (
-    <Card className="glass-card">
+    <Card className="bg-card border border-border rounded-meta-card shadow-meta-subtle">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
+          <CardTitle className="text-meta-body font-semibold flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" strokeWidth={1.5} />
             Recomendações IA
           </CardTitle>
           <Button
@@ -105,16 +105,16 @@ export default function AIRecommendationsPanel() {
             variant="outline"
             onClick={generate}
             disabled={loading || current.length === 0}
-            className="h-7 text-xs gap-1.5"
+            className="h-7 text-meta-caption gap-1.5"
           >
-            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" strokeWidth={1.5} />}
             {loading ? 'Analisando...' : 'Gerar'}
           </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
         {recommendations.length === 0 && !loading && (
-          <p className="text-xs text-muted-foreground text-center py-4">
+          <p className="text-meta-caption text-muted-foreground text-center py-4">
             Clique em "Gerar" para receber recomendações de IA baseadas nos dados atuais
           </p>
         )}
@@ -122,7 +122,7 @@ export default function AIRecommendationsPanel() {
         {loading && recommendations.length === 0 && (
           <div className="flex items-center justify-center py-8 gap-2">
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            <span className="text-xs text-muted-foreground">Analisando métricas...</span>
+            <span className="text-meta-caption text-muted-foreground">Analisando métricas...</span>
           </div>
         )}
 
@@ -133,7 +133,7 @@ export default function AIRecommendationsPanel() {
           return (
             <div
               key={i}
-              className="border border-border rounded-lg p-3 space-y-2 hover:bg-secondary/30 transition-colors cursor-pointer"
+              className="border border-border rounded-meta-btn p-3 space-y-2 hover:bg-secondary/30 transition-colors cursor-pointer"
               onClick={() => setExpanded(isExpanded ? null : i)}
             >
               <div className="flex items-start gap-2">

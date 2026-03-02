@@ -147,19 +147,19 @@ export default function ActionCenter() {
   const closedActions = actions.filter(a => a.status !== 'open');
 
   const getSeverityColor = (priority: number) => {
-    if (priority >= 80) return 'text-red-400 border-red-500/30 bg-red-500/10';
-    if (priority >= 60) return 'text-amber-400 border-amber-500/30 bg-amber-500/10';
-    return 'text-blue-400 border-blue-500/30 bg-blue-500/10';
+    if (priority >= 80) return 'text-destructive border-destructive/30 bg-destructive/10';
+    if (priority >= 60) return 'text-warning border-warning/30 bg-warning/10';
+    return 'text-primary border-primary/30 bg-primary/10';
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Zap className="h-5 w-5 text-primary" />
-          Action Center
+          <Zap className="h-5 w-5 text-primary" strokeWidth={1.5} />
+           Action Center
           {openActions.length > 0 && (
-            <Badge variant="secondary" className="bg-primary/20 text-primary text-xs">
+             <Badge variant="secondary" className="bg-primary/10 text-primary text-meta-caption">
               {openActions.length} ações
             </Badge>
           )}
@@ -167,10 +167,10 @@ export default function ActionCenter() {
       </div>
 
       {openActions.length === 0 && (
-        <Card className="glass-card border-border/30">
+        <Card className="bg-card border border-border rounded-meta-card shadow-meta-subtle">
           <CardContent className="py-8 text-center text-muted-foreground">
-            <CheckCircle className="h-8 w-8 mx-auto mb-2 text-emerald-400" />
-            <p className="text-sm">Nenhuma ação pendente — performance dentro do esperado.</p>
+            <CheckCircle className="h-8 w-8 mx-auto mb-2 text-positive" strokeWidth={1.5} />
+            <p className="text-meta-body">Nenhuma ação pendente — performance dentro do esperado.</p>
           </CardContent>
         </Card>
       )}
@@ -184,16 +184,16 @@ export default function ActionCenter() {
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <Card className={`glass-card border ${getSeverityColor(action.priority)} cursor-pointer`}
+            <Card className={`bg-card border rounded-meta-card shadow-meta-subtle ${getSeverityColor(action.priority)} cursor-pointer`}
               onClick={() => setExpanded(expanded === action.id ? null : action.id)}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                      <span className="font-medium text-sm">{action.title}</span>
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                      <AlertTriangle className="h-4 w-4 flex-shrink-0" strokeWidth={1.5} />
+                      <span className="font-medium text-meta-body">{action.title}</span>
+                      <Badge variant="outline" className="text-meta-label px-1.5 py-0">
                         {Math.round(action.confidence * 100)}%
                       </Badge>
                     </div>
@@ -227,13 +227,13 @@ export default function ActionCenter() {
                             />
                           </div>
                           <div className="flex gap-2 pt-1">
-                            <Button size="sm" variant="outline" className="text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+                             <Button size="sm" variant="outline" className="text-positive border-positive/30 hover:bg-positive/10"
                               onClick={e => { e.stopPropagation(); handleAction(action.id, 'done'); }}>
-                              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Executar
+                              <CheckCircle className="h-3.5 w-3.5 mr-1" strokeWidth={1.5} /> Executar
                             </Button>
-                            <Button size="sm" variant="outline" className="text-muted-foreground hover:bg-muted/20"
+                            <Button size="sm" variant="outline" className="text-muted-foreground hover:bg-secondary"
                               onClick={e => { e.stopPropagation(); handleAction(action.id, 'ignored'); }}>
-                              <XCircle className="h-3.5 w-3.5 mr-1" /> Ignorar
+                              <XCircle className="h-3.5 w-3.5 mr-1" strokeWidth={1.5} /> Ignorar
                             </Button>
                           </div>
                         </motion.div>
@@ -254,7 +254,7 @@ export default function ActionCenter() {
           <div className="mt-2 space-y-1">
             {closedActions.map(a => (
               <div key={a.id} className="flex items-center gap-2 opacity-50">
-                {a.status === 'done' ? <CheckCircle className="h-3 w-3 text-emerald-400" /> : <XCircle className="h-3 w-3" />}
+              {a.status === 'done' ? <CheckCircle className="h-3 w-3 text-positive" strokeWidth={1.5} /> : <XCircle className="h-3 w-3" strokeWidth={1.5} />}
                 <span>{a.title}</span>
               </div>
             ))}

@@ -158,9 +158,9 @@ export default function ActionPanel() {
   };
 
   return (
-    <div className="glass-card p-5">
-      <h3 className="text-sm font-medium text-foreground mb-4 flex items-center gap-2">
-        <Zap className="h-4 w-4 text-warning" />
+    <div className="bg-card border border-border rounded-meta-card p-5 shadow-meta-subtle">
+      <h3 className="text-meta-body font-semibold text-foreground mb-4 flex items-center gap-2">
+        <Zap className="h-4 w-4 text-warning" strokeWidth={1.5} />
         O que fazer agora? ({actions.length} ações)
       </h3>
       <div className="space-y-2">
@@ -169,20 +169,20 @@ export default function ActionPanel() {
           return (
             <div
               key={i}
-              className={`rounded-lg bg-secondary/30 border-l-4 ${priorityColors[a.priority]} transition-all`}
+              className={`rounded-meta-btn bg-secondary/30 border-l-[3px] ${priorityColors[a.priority]} transition-all`}
             >
               <button
                 onClick={() => setExpandedIdx(isExpanded ? null : i)}
-                className="flex items-start gap-3 p-3 w-full text-left hover:bg-secondary/50 transition-colors rounded-lg"
+                className="flex items-start gap-3 p-3 w-full text-left hover:bg-secondary/50 transition-colors rounded-meta-btn"
               >
                 <span className={`flex-shrink-0 mt-0.5 ${a.priority === 'high' ? 'text-negative' : a.priority === 'medium' ? 'text-warning' : 'text-muted-foreground'}`}>
                   {a.icon}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-foreground">
+                    <p className="text-meta-body font-semibold text-foreground">
                     {a.action}: <span className="font-normal text-foreground/80">{a.target}</span>
                   </p>
-                  <p className="text-[11px] text-muted-foreground">{a.reason}</p>
+                   <p className="text-meta-caption text-muted-foreground">{a.reason}</p>
                 </div>
                 <span className="flex-shrink-0 text-muted-foreground mt-0.5">
                   {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -196,7 +196,7 @@ export default function ActionPanel() {
                     {a.metrics.map((m, j) => (
                       <span
                         key={j}
-                        className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-surface-2/80 text-muted-foreground border border-border/50"
+                        className="text-meta-label px-2 py-0.5 rounded-meta-pill bg-secondary text-muted-foreground border border-border"
                       >
                         {m}
                       </span>
@@ -204,10 +204,10 @@ export default function ActionPanel() {
                   </div>
 
                   {/* Guidance */}
-                  <div className="bg-primary/5 border border-primary/20 rounded-md px-3 py-2">
-                    <p className="text-[11px] font-medium text-primary mb-1">💡 O que fazer:</p>
-                    <p className="text-[11px] text-foreground/80 leading-relaxed">{a.guidance}</p>
-                  </div>
+                   <div className="bg-primary/5 border border-primary/20 rounded-meta-btn px-3 py-2">
+                     <p className="text-meta-caption font-medium text-primary mb-1">💡 O que fazer:</p>
+                     <p className="text-meta-caption text-foreground/80 leading-relaxed">{a.guidance}</p>
+                   </div>
                 </div>
               )}
             </div>

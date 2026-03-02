@@ -201,10 +201,10 @@
 }
 
 @layer utilities {
-  /* Glass panels — simplified for Meta style */
+  /* Glass panels — Meta Ads Manager style */
   .glass-panel {
-    @apply bg-card border border-border rounded-lg;
-    box-shadow: var(--shadow-card);
+    @apply bg-card border border-border rounded-meta-card;
+    box-shadow: var(--shadow-subtle);
   }
 
   .glass-card {
@@ -212,7 +212,7 @@
   }
 
   .surface-elevated {
-    @apply bg-card border border-border rounded-lg;
+    @apply bg-card border border-border rounded-meta-card;
     box-shadow: var(--shadow-card);
   }
 

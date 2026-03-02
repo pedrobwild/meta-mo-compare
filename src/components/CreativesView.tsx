@@ -73,10 +73,10 @@ interface EnrichedCreative extends AdCreative {
 
 // Config
 const STAGE_CONFIG: Record<string, { label: string; badge: string; color: string; bgClass: string; action: string }> = {
-  fresh: { label: 'Novo', badge: '🆕', color: 'text-blue-400', bgClass: 'bg-blue-500/15 text-blue-400 border-blue-500/30', action: 'Aguardar 48h' },
-  peaking: { label: 'Escalando', badge: '🚀', color: 'text-emerald-400', bgClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', action: '🚀 Escalar +20%' },
-  declining: { label: 'Declinando', badge: '⚠️', color: 'text-amber-400', bgClass: 'bg-amber-500/15 text-amber-400 border-amber-500/30', action: '⚠️ Preparar substituto' },
-  fatigued: { label: 'Fadigado', badge: '🔴', color: 'text-red-400', bgClass: 'bg-red-500/15 text-red-400 border-red-500/30', action: '🔴 Pausar agora' },
+  fresh: { label: 'Novo', badge: '🆕', color: 'text-primary', bgClass: 'bg-primary/10 text-primary border-primary/30', action: 'Aguardar 48h' },
+  peaking: { label: 'Escalando', badge: '🚀', color: 'text-positive', bgClass: 'bg-positive/10 text-positive border-positive/30', action: '🚀 Escalar +20%' },
+  declining: { label: 'Declinando', badge: '⚠️', color: 'text-warning', bgClass: 'bg-warning/10 text-warning border-warning/30', action: '⚠️ Preparar substituto' },
+  fatigued: { label: 'Fadigado', badge: '🔴', color: 'text-destructive', bgClass: 'bg-destructive/10 text-destructive border-destructive/30', action: '🔴 Pausar agora' },
 };
 
 const ANGLE_LABELS: Record<string, string> = {
@@ -222,7 +222,7 @@ function AnalysisModal({ creative, open, onClose, accountAvgs }: {
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="glass-panel max-w-2xl max-h-[80vh]">
+      <DialogContent className="glass-panel max-w-2xl max-h-[80vh] rounded-meta-modal">
         <DialogHeader>
           <DialogTitle className="text-sm flex items-center gap-2">
             <Bot className="h-4 w-4 text-primary" />
@@ -336,7 +336,7 @@ function PortfolioAnalysisModal({ open, onClose, creatives, accountAvgs }: {
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="glass-panel max-w-2xl max-h-[80vh]">
+      <DialogContent className="glass-panel max-w-2xl max-h-[80vh] rounded-meta-modal">
         <DialogHeader>
           <DialogTitle className="text-sm flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
@@ -394,7 +394,7 @@ function EditCreativeDialog({ creative, open, onClose, onSaved }: {
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="glass-panel max-w-sm">
+      <DialogContent className="glass-panel max-w-sm rounded-meta-modal">
         <DialogHeader>
           <DialogTitle className="text-sm">Editar Criativo</DialogTitle>
         </DialogHeader>
@@ -447,10 +447,10 @@ function SummaryCards({ creatives, accountAvgCtr, avgDegradation }: {
 
   const cards = [
     { label: 'Criativos Ativos', value: active.length, icon: Layers, color: 'text-foreground' },
-    { label: 'Em Peaking', value: peaking, icon: TrendingUp, color: 'text-emerald-400' },
-    { label: 'Fatigued', value: fatigued, icon: TrendingDown, color: 'text-red-400' },
+    { label: 'Em Peaking', value: peaking, icon: TrendingUp, color: 'text-positive' },
+    { label: 'Fatigued', value: fatigued, icon: TrendingDown, color: 'text-destructive' },
     { label: 'CTR Médio', value: `${accountAvgCtr.toFixed(2)}%`, icon: Eye, color: 'text-primary' },
-    { label: 'Degradação Média', value: `${avgDegradation.toFixed(0)}%`, icon: TrendingDown, color: avgDegradation > 25 ? 'text-red-400' : 'text-amber-400' },
+    { label: 'Degradação Média', value: `${avgDegradation.toFixed(0)}%`, icon: TrendingDown, color: avgDegradation > 25 ? 'text-destructive' : 'text-warning' },
   ];
 
   return (
@@ -477,14 +477,14 @@ function CreativeCard({ creative, onAnalyze, onEdit }: {
   onEdit: () => void;
 }) {
   const cfg = STAGE_CONFIG[creative.lifecycle_stage] || STAGE_CONFIG.fresh;
-  const degradColor = creative.degradation_pct > 30 ? 'text-red-400' : creative.degradation_pct > 15 ? 'text-amber-400' : 'text-emerald-400';
+  const degradColor = creative.degradation_pct > 30 ? 'text-destructive' : creative.degradation_pct > 15 ? 'text-warning' : 'text-positive';
   const TypeIcon = TYPE_ICONS[creative.creative_type || ''] || Image;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`glass-panel p-3 space-y-2 ${creative.lifecycle_stage === 'fatigued' ? 'border-red-500/30' : creative.lifecycle_stage === 'declining' ? 'border-amber-500/20' : ''}`}
+      className={`glass-panel p-3 space-y-2 ${creative.lifecycle_stage === 'fatigued' ? 'border-destructive/30' : creative.lifecycle_stage === 'declining' ? 'border-warning/20' : ''}`}
     >
       {/* Thumbnail */}
       {creative.thumbnail_url ? (
@@ -575,7 +575,7 @@ function DegradationTab({ creatives }: { creatives: EnrichedCreative[] }) {
           </SelectContent>
         </Select>
         <StageBadge stage={creative.lifecycle_stage} />
-        <span className="text-xs text-muted-foreground">Degradação: <span className={`font-bold ${creative.degradation_pct > 30 ? 'text-red-400' : 'text-amber-400'}`}>{creative.degradation_pct.toFixed(1)}%</span></span>
+        <span className="text-xs text-muted-foreground">Degradação: <span className={`font-bold ${creative.degradation_pct > 30 ? 'text-destructive' : 'text-warning'}`}>{creative.degradation_pct.toFixed(1)}%</span></span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -668,7 +668,7 @@ function AngleLibraryTab({ creatives }: { creatives: EnrichedCreative[] }) {
                   </div>
                   <div>
                     <p className="text-[9px] text-muted-foreground">% Sucesso</p>
-                    <p className={`text-sm font-mono font-bold ${a.success_rate > 50 ? 'text-emerald-400' : a.success_rate > 20 ? 'text-amber-400' : 'text-red-400'}`}>
+                    <p className={`text-sm font-mono font-bold ${a.success_rate > 50 ? 'text-positive' : a.success_rate > 20 ? 'text-warning' : 'text-destructive'}`}>
                       {a.success_rate.toFixed(0)}%
                     </p>
                   </div>

@@ -49,23 +49,23 @@ interface OptimizationEntry {
 // ── Constants ──
 
 const DECISION_TYPES: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  pausar: { label: 'Pausar', icon: <Pause className="h-4 w-4" />, color: 'text-red-400' },
-  escalar: { label: 'Escalar', icon: <Rocket className="h-4 w-4" />, color: 'text-emerald-400' },
-  revisar_criativo: { label: 'Revisar Criativo', icon: <Palette className="h-4 w-4" />, color: 'text-violet-400' },
-  alterar_publico: { label: 'Alterar Público', icon: <Users className="h-4 w-4" />, color: 'text-blue-400' },
-  alterar_orcamento: { label: 'Alterar Orçamento', icon: <DollarSign className="h-4 w-4" />, color: 'text-amber-400' },
-  alterar_lance: { label: 'Alterar Lance', icon: <TrendingUp className="h-4 w-4" />, color: 'text-orange-400' },
-  novo_criativo: { label: 'Novo Criativo', icon: <Plus className="h-4 w-4" />, color: 'text-pink-400' },
-  novo_adset: { label: 'Novo Ad Set', icon: <Plus className="h-4 w-4" />, color: 'text-cyan-400' },
-  novo_publico: { label: 'Novo Público', icon: <Plus className="h-4 w-4" />, color: 'text-indigo-400' },
+  pausar: { label: 'Pausar', icon: <Pause className="h-4 w-4" />, color: 'text-destructive' },
+  escalar: { label: 'Escalar', icon: <Rocket className="h-4 w-4" />, color: 'text-positive' },
+  revisar_criativo: { label: 'Revisar Criativo', icon: <Palette className="h-4 w-4" />, color: 'text-primary' },
+  alterar_publico: { label: 'Alterar Público', icon: <Users className="h-4 w-4" />, color: 'text-primary' },
+  alterar_orcamento: { label: 'Alterar Orçamento', icon: <DollarSign className="h-4 w-4" />, color: 'text-warning' },
+  alterar_lance: { label: 'Alterar Lance', icon: <TrendingUp className="h-4 w-4" />, color: 'text-warning' },
+  novo_criativo: { label: 'Novo Criativo', icon: <Plus className="h-4 w-4" />, color: 'text-primary' },
+  novo_adset: { label: 'Novo Ad Set', icon: <Plus className="h-4 w-4" />, color: 'text-primary' },
+  novo_publico: { label: 'Novo Público', icon: <Plus className="h-4 w-4" />, color: 'text-primary' },
   outro: { label: 'Outro', icon: <Eye className="h-4 w-4" />, color: 'text-muted-foreground' },
 };
 
 const STATUS_CONFIG: Record<string, { label: string; emoji: string; color: string }> = {
-  pending: { label: 'Pendente', emoji: '🟡', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-  monitoring: { label: 'Monitorando', emoji: '🟡', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-  confirmed: { label: 'Confirmada', emoji: '🟢', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
-  reversed: { label: 'Revertida', emoji: '🔴', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
+  pending: { label: 'Pendente', emoji: '🟡', color: 'bg-warning/10 text-warning border-warning/30' },
+  monitoring: { label: 'Monitorando', emoji: '🟡', color: 'bg-primary/10 text-primary border-primary/30' },
+  confirmed: { label: 'Confirmada', emoji: '🟢', color: 'bg-positive/10 text-positive border-positive/30' },
+  reversed: { label: 'Revertida', emoji: '🔴', color: 'bg-destructive/10 text-destructive border-destructive/30' },
 };
 
 const TAG_OPTIONS = ['criativo', 'escala', 'fadiga', 'público', 'orçamento', 'lance', 'LP', 'funil', 'teste', 'urgente'];
@@ -443,13 +443,13 @@ Analise e responda:
         </Card>
         <Card className="glass-card">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-emerald-400">{stats.successRate.toFixed(0)}%</p>
+            <p className="text-2xl font-bold text-positive">{stats.successRate.toFixed(0)}%</p>
             <p className="text-xs text-muted-foreground">Taxa de sucesso</p>
           </CardContent>
         </Card>
         <Card className="glass-card">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-amber-400">{stats.pending}</p>
+            <p className="text-2xl font-bold text-warning">{stats.pending}</p>
             <p className="text-xs text-muted-foreground">Pendentes</p>
           </CardContent>
         </Card>
@@ -566,7 +566,7 @@ Analise e responda:
 
               return (
                 <motion.div key={entry.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                  <Card className={`glass-card group ${needsConfirmation ? 'border-amber-500/40' : ''}`}>
+                  <Card className={`glass-card group ${needsConfirmation ? 'border-warning/40' : ''}`}>
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
                         {/* Icon */}
@@ -582,7 +582,7 @@ Analise e responda:
                               <Badge key={t} variant="secondary" className="text-[10px]">{t}</Badge>
                             ))}
                             {needsConfirmation && (
-                              <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px] animate-pulse">
+                              <Badge className="bg-warning/10 text-warning border-warning/30 text-[10px] animate-pulse">
                                 ⏰ Confirmar impacto
                               </Badge>
                             )}
@@ -605,7 +605,7 @@ Analise e responda:
                                     {after != null && (
                                       <>
                                         {' '}<ArrowRight className="h-3 w-3 inline" />{' '}
-                                        <span className={improved ? 'text-emerald-400' : 'text-red-400'}>
+                                         <span className={improved ? 'text-positive' : 'text-destructive'}>
                                           {formatKpi(key, after)} {improved ? '✅' : '❌'}
                                         </span>
                                       </>
