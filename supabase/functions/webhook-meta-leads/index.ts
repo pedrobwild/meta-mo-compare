@@ -112,9 +112,7 @@ Deno.serve(async (req) => {
               return f?.values?.[0] || null;
             };
 
-            const { error } = await supabase
-              .from('meta_leads')
-              .upsert({
+            const metaLeadRow = {
                 workspace_id: workspaceId,
                 lead_id: lead.id,
                 form_id: resolvedFormId,
@@ -130,13 +128,47 @@ Deno.serve(async (req) => {
                 platform: lead.platform || 'facebook',
                 raw_json: lead,
                 synced_at: new Date().toISOString(),
-              }, { onConflict: 'workspace_id,lead_id' });
+              };
+
+            const { error } = await supabase
+              .from('meta_leads')
+              .upsert(metaLeadRow, { onConflict: 'workspace_id,lead_id' });
 
             if (error) {
               console.error(`[WEBHOOK] Upsert error for lead ${leadgenId}:`, JSON.stringify(error));
             } else {
               leadsProcessed++;
               console.log(`[WEBHOOK] ✅ Lead ${leadgenId} saved (form: ${resolvedFormId})`);
+
+              // ─── Auto-create funnel_leads entry ───
+              const funnelLead = {
+                workspace_id: workspaceId,
+                lead_id: `meta_${lead.id}`,
+                name: metaLeadRow.lead_name || null,
+                email: metaLeadRow.lead_email || null,
+                phone: metaLeadRow.lead_phone || null,
+                campaign_id: metaLeadRow.campaign_id || null,
+                adset_id: metaLeadRow.adset_id || null,
+                ad_id: metaLeadRow.ad_id || null,
+                source: 'meta_lead_ads',
+                stage: 'lead',
+                utm_source: fieldMap['utm_source'] || 'facebook',
+                utm_medium: fieldMap['utm_medium'] || 'paid',
+                utm_campaign: fieldMap['utm_campaign'] || metaLeadRow.campaign_id || null,
+                utm_content: fieldMap['utm_content'] || metaLeadRow.ad_id || null,
+                utm_term: fieldMap['utm_term'] || null,
+                created_at: metaLeadRow.created_time,
+              };
+
+              const { error: funnelErr } = await supabase
+                .from('funnel_leads')
+                .upsert(funnelLead, { onConflict: 'workspace_id,lead_id' });
+
+              if (funnelErr) {
+                console.error(`[WEBHOOK] funnel_leads upsert error for ${leadgenId}:`, JSON.stringify(funnelErr));
+              } else {
+                console.log(`[WEBHOOK] ✅ funnel_lead created for ${leadgenId}`);
+              }
             }
           } catch (e: any) {
             console.error(`[WEBHOOK] Error processing lead ${leadgenId}:`, e.message);

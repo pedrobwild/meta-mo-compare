@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
           };
         });
 
-        // Batch upsert
+        // Batch upsert meta_leads + funnel_leads
         for (let i = 0; i < rows.length; i += 500) {
           const batch = rows.slice(i, i + 500);
           const { error, data } = await supabase
@@ -196,6 +196,36 @@ Deno.serve(async (req) => {
             console.error(`[LEADS] Upsert error for form ${formId}:`, JSON.stringify(error));
           } else {
             totalUpserted += data?.length || batch.length;
+          }
+
+          // Auto-create funnel_leads entries
+          const funnelBatch = batch.map((row: any) => ({
+            workspace_id: row.workspace_id,
+            lead_id: `meta_${row.lead_id}`,
+            name: row.lead_name || null,
+            email: row.lead_email || null,
+            phone: row.lead_phone || null,
+            campaign_id: row.campaign_id || null,
+            adset_id: row.adset_id || null,
+            ad_id: row.ad_id || null,
+            source: 'meta_lead_ads',
+            stage: 'lead',
+            utm_source: row.field_data?.['utm_source'] || 'facebook',
+            utm_medium: row.field_data?.['utm_medium'] || 'paid',
+            utm_campaign: row.field_data?.['utm_campaign'] || row.campaign_id || null,
+            utm_content: row.field_data?.['utm_content'] || row.ad_id || null,
+            utm_term: row.field_data?.['utm_term'] || null,
+            created_at: row.created_time,
+          }));
+
+          const { error: funnelErr } = await supabase
+            .from('funnel_leads')
+            .upsert(funnelBatch, { onConflict: 'workspace_id,lead_id' });
+
+          if (funnelErr) {
+            console.error(`[LEADS] funnel_leads upsert error:`, JSON.stringify(funnelErr));
+          } else {
+            console.log(`[LEADS] ✅ ${funnelBatch.length} funnel_leads created/updated`);
           }
         }
       } catch (e: any) {
