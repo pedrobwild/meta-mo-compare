@@ -433,14 +433,14 @@ export type Database = {
         Row: {
           actions_json: Json | null
           ad_account_id: string
-          ad_id: string | null
+          ad_id: string
           add_to_cart: number
-          adset_id: string | null
-          age: string | null
-          attribution_setting: string | null
-          campaign_id: string | null
+          adset_id: string
+          age: string
+          attribution_setting: string
+          campaign_id: string
           clicks: number
-          country: string | null
+          country: string
           cpa_lead: number | null
           cpc_link: number | null
           cpm: number | null
@@ -448,17 +448,17 @@ export type Database = {
           creative_id: string | null
           ctr_link: number | null
           date: string
-          device_platform: string | null
+          device_platform: string
           frequency: number | null
-          gender: string | null
+          gender: string
           id: string
           impressions: number
           initiate_checkout: number
           inline_link_clicks: number
           landing_page_views: number
           level: string
-          placement: string | null
-          publisher_platform: string | null
+          placement: string
+          publisher_platform: string
           purchase_value: number
           purchases: number
           reach: number
@@ -470,14 +470,14 @@ export type Database = {
         Insert: {
           actions_json?: Json | null
           ad_account_id: string
-          ad_id?: string | null
+          ad_id?: string
           add_to_cart?: number
-          adset_id?: string | null
-          age?: string | null
-          attribution_setting?: string | null
-          campaign_id?: string | null
+          adset_id?: string
+          age?: string
+          attribution_setting?: string
+          campaign_id?: string
           clicks?: number
-          country?: string | null
+          country?: string
           cpa_lead?: number | null
           cpc_link?: number | null
           cpm?: number | null
@@ -485,17 +485,17 @@ export type Database = {
           creative_id?: string | null
           ctr_link?: number | null
           date: string
-          device_platform?: string | null
+          device_platform?: string
           frequency?: number | null
-          gender?: string | null
+          gender?: string
           id?: string
           impressions?: number
           initiate_checkout?: number
           inline_link_clicks?: number
           landing_page_views?: number
           level?: string
-          placement?: string | null
-          publisher_platform?: string | null
+          placement?: string
+          publisher_platform?: string
           purchase_value?: number
           purchases?: number
           reach?: number
@@ -507,14 +507,14 @@ export type Database = {
         Update: {
           actions_json?: Json | null
           ad_account_id?: string
-          ad_id?: string | null
+          ad_id?: string
           add_to_cart?: number
-          adset_id?: string | null
-          age?: string | null
-          attribution_setting?: string | null
-          campaign_id?: string | null
+          adset_id?: string
+          age?: string
+          attribution_setting?: string
+          campaign_id?: string
           clicks?: number
-          country?: string | null
+          country?: string
           cpa_lead?: number | null
           cpc_link?: number | null
           cpm?: number | null
@@ -522,17 +522,17 @@ export type Database = {
           creative_id?: string | null
           ctr_link?: number | null
           date?: string
-          device_platform?: string | null
+          device_platform?: string
           frequency?: number | null
-          gender?: string | null
+          gender?: string
           id?: string
           impressions?: number
           initiate_checkout?: number
           inline_link_clicks?: number
           landing_page_views?: number
           level?: string
-          placement?: string | null
-          publisher_platform?: string | null
+          placement?: string
+          publisher_platform?: string
           purchase_value?: number
           purchases?: number
           reach?: number

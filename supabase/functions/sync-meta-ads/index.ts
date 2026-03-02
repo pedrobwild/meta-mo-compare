@@ -309,21 +309,42 @@ Deno.serve(async (req) => {
 
     // Upsert into facts_meta_insights_daily
     let upserted = 0;
+    const CONFLICT_COLS = 'workspace_id,ad_account_id,date,level,campaign_id,adset_id,ad_id,placement,device_platform,publisher_platform,age,gender,country,attribution_setting';
     if (factRows.length > 0 && workspaceId && adAccountDbId) {
+      // Ensure all breakdown columns are non-null strings
+      for (const row of factRows) {
+        row.campaign_id = row.campaign_id || '';
+        row.adset_id = row.adset_id || '';
+        row.ad_id = row.ad_id || '';
+        row.placement = row.placement || '';
+        row.device_platform = row.device_platform || '';
+        row.publisher_platform = row.publisher_platform || '';
+        row.age = row.age || '';
+        row.gender = row.gender || '';
+        row.country = row.country || '';
+        row.attribution_setting = row.attribution_setting || '';
+      }
+
       for (let i = 0; i < factRows.length; i += 500) {
         const batch = factRows.slice(i, i + 500);
         const { error } = await supabase
           .from('facts_meta_insights_daily')
           .upsert(batch, {
-            onConflict: 'workspace_id,ad_account_id,date,level,campaign_id,adset_id,ad_id,placement,device_platform,publisher_platform,age,gender,country,attribution_setting',
+            onConflict: CONFLICT_COLS,
             ignoreDuplicates: false,
           });
         if (error) {
-          console.error('Fact upsert error:', error);
-          // Fallback: insert one by one
+          console.error('Fact upsert batch error:', JSON.stringify(error));
+          // Fallback: insert one by one with same conflict spec
           for (const row of batch) {
-            const { error: singleErr } = await supabase.from('facts_meta_insights_daily').upsert(row);
-            if (!singleErr) upserted++;
+            const { error: singleErr } = await supabase
+              .from('facts_meta_insights_daily')
+              .upsert(row, { onConflict: CONFLICT_COLS, ignoreDuplicates: false });
+            if (singleErr) {
+              console.error('Single row upsert error:', JSON.stringify(singleErr));
+            } else {
+              upserted++;
+            }
           }
         } else {
           upserted += batch.length;
