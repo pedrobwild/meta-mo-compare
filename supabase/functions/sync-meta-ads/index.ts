@@ -273,6 +273,129 @@ Deno.serve(async (req) => {
       console.log(`[SYNC] meta_ads: ${adsUpserted} upserted`);
     }
 
+    // ─── STEP 1b: Fetch & upsert AD CREATIVES ───
+    let creativesUpserted = 0;
+    if (ads.length > 0 && workspaceId) {
+      console.log(`[SYNC] Fetching creative details for ${ads.length} ads...`);
+      const creativeRows: any[] = [];
+
+      // Batch fetch creative details (50 at a time to avoid rate limits)
+      for (let i = 0; i < ads.length; i += 50) {
+        const batch = ads.slice(i, i + 50);
+        const adIds = batch.map((a: any) => a.id).join(',');
+        
+        try {
+          const creativesUrl = `https://graph.facebook.com/${META_API_VERSION}/?ids=${adIds}&fields=id,name,adset_id,campaign_id,status,effective_status,creative{id,name,thumbnail_url,body,title,call_to_action_type,video_id,image_url}&access_token=${accessToken}`;
+          const creativesRes = await fetchWithRetry(creativesUrl);
+          const creativesData = await creativesRes.json();
+
+          for (const adId of Object.keys(creativesData)) {
+            const ad = creativesData[adId];
+            if (!ad || ad.error) continue;
+            const creative = ad.creative || {};
+            
+            // Detect creative_type from available fields
+            let creativeType = 'image';
+            if (creative.video_id) creativeType = 'video';
+            
+            creativeRows.push({
+              workspace_id: workspaceId,
+              ad_id: adId,
+              ad_name: ad.name || '',
+              campaign_id: ad.campaign_id || null,
+              adset_id: ad.adset_id || null,
+              status: ad.effective_status || ad.status || 'active',
+              creative_type: creativeType,
+              thumbnail_url: creative.thumbnail_url || creative.image_url || null,
+              hook: creative.title || null,
+              cta: creative.call_to_action_type || null,
+              angle: creative.body?.slice(0, 200) || null,
+            });
+          }
+        } catch (batchErr) {
+          console.error(`[SYNC] Creative batch error (ads ${i}-${i + batch.length}):`, batchErr);
+        }
+
+        if (i + 50 < ads.length) await sleep(500); // rate limit
+      }
+
+      // Upsert ad_creatives
+      if (creativeRows.length > 0) {
+        for (let i = 0; i < creativeRows.length; i += 200) {
+          const batch = creativeRows.slice(i, i + 200);
+          const { error, data } = await supabase.from('ad_creatives').upsert(batch, {
+            onConflict: 'workspace_id,ad_id',
+          }).select('id');
+          if (error) {
+            console.error(`[SYNC] ad_creatives upsert error:`, JSON.stringify(error));
+          } else {
+            creativesUpserted += data?.length || batch.length;
+          }
+        }
+        console.log(`[SYNC] ad_creatives: ${creativesUpserted}/${creativeRows.length} upserted`);
+      }
+    }
+
+    // ─── STEP 1c: Fetch & upsert CREATIVE DAILY METRICS ───
+    let creativeDailyUpserted = 0;
+    if (ads.length > 0 && workspaceId && adAccountDbId) {
+      console.log(`[SYNC] Fetching creative daily metrics (${since} to ${until})...`);
+      
+      const cdmFields = 'ad_id,ad_name,impressions,clicks,spend,actions,ctr,cpm,frequency,reach';
+      const cdmParams = new URLSearchParams({
+        fields: cdmFields,
+        level: 'ad',
+        time_increment: '1',
+        limit: '500',
+        access_token: accessToken,
+        time_range: JSON.stringify({ since, until }),
+      });
+      const cdmUrl = `https://graph.facebook.com/${META_API_VERSION}/${accountId}/insights?${cdmParams.toString()}`;
+      const cdmInsights = await fetchAllPages(cdmUrl);
+      console.log(`[SYNC] Fetched ${cdmInsights.length} creative daily metric rows`);
+
+      const cdmRows = cdmInsights.map((ins: any) => {
+        const spend = parseFloat(ins.spend) || 0;
+        const impressions = parseInt(ins.impressions) || 0;
+        const clicks = parseInt(ins.clicks) || 0;
+        const reach = parseInt(ins.reach) || 0;
+        const leads = getActionValue(ins.actions, 'lead')
+          || getActionValue(ins.actions, 'onsite_conversion.messaging_first_reply')
+          || getActionValue(ins.actions, 'offsite_conversion.fb_pixel_lead');
+
+        return {
+          workspace_id: workspaceId,
+          ad_id: ins.ad_id || '',
+          date: ins.date_start,
+          impressions,
+          clicks,
+          spend,
+          reach,
+          leads,
+          ctr: parseFloat(ins.ctr) || 0,
+          cpm: parseFloat(ins.cpm) || 0,
+          frequency: parseFloat(ins.frequency) || 0,
+          cpc: clicks > 0 ? spend / clicks : 0,
+          cpl: leads > 0 ? spend / leads : 0,
+        };
+      });
+
+      if (cdmRows.length > 0) {
+        for (let i = 0; i < cdmRows.length; i += 500) {
+          const batch = cdmRows.slice(i, i + 500);
+          const { error } = await supabase.from('creative_daily_metrics').upsert(batch, {
+            onConflict: 'workspace_id,ad_id,date',
+          });
+          if (error) {
+            console.error(`[SYNC] creative_daily_metrics upsert error:`, JSON.stringify(error));
+          } else {
+            creativeDailyUpserted += batch.length;
+          }
+        }
+        console.log(`[SYNC] creative_daily_metrics: ${creativeDailyUpserted}/${cdmRows.length} upserted`);
+      }
+    }
+
     // ─── STEP 2: Fetch INSIGHTS ───
     // Updated fields for Meta 2026:
     // - Added video_thru_play_actions (replaces deprecated 10-second views)
@@ -511,6 +634,8 @@ Deno.serve(async (req) => {
       campaigns: { fetched: campaigns.length, upserted: campaignsUpserted },
       adsets: { fetched: adsets.length, upserted: adsetsUpserted },
       ads: { fetched: ads.length, upserted: adsUpserted },
+      creatives: { upserted: creativesUpserted },
+      creative_daily_metrics: { upserted: creativeDailyUpserted },
       insights: { fetched: insights.length, upserted },
       legacy_records: { upserted: legacyUpserted },
       meta_2026: { api_version: META_API_VERSION, attribution: ATTRIBUTION_SETTING },
@@ -523,8 +648,10 @@ Deno.serve(async (req) => {
         records: upserted,
         entities: totalEntities,
         insights_fetched: insights.length,
+        creatives_upserted: creativesUpserted,
+        creative_daily_metrics_upserted: creativeDailyUpserted,
         details: summary,
-        message: `${upserted} insights + ${totalEntities} entities sincronizados (${META_API_VERSION}, ${ATTRIBUTION_SETTING})`,
+        message: `${upserted} insights + ${totalEntities} entities + ${creativesUpserted} criativos sincronizados (${META_API_VERSION}, ${ATTRIBUTION_SETTING})`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
