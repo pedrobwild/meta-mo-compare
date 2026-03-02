@@ -539,6 +539,49 @@ Deno.serve(async (req) => {
       }).eq('id', syncRunId);
     }
 
+    // Auto-alert on expired token
+    const isTokenExpired = error.message?.includes('Session has expired') ||
+      error.message?.includes('Error validating access token') ||
+      (error.message?.includes('OAuthException') && error.message?.includes('"code":190'));
+
+    if (isTokenExpired) {
+      console.log('[SYNC] 🔴 Token expirado detectado — enviando alerta por e-mail');
+      try {
+        const resendKey = Deno.env.get('RESEND_API_KEY');
+        if (resendKey) {
+          await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              from: 'bwild Alerts <onboarding@resend.dev>',
+              to: ['pedro@bwild.com.br', 'matheus@bwild.com.br'],
+              subject: '🔴 URGENTE: Token Meta Ads expirado — renovar agora',
+              html: `
+                <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">
+                  <h2 style="color:#dc2626">⚠️ Token Meta Ads Expirado</h2>
+                  <p>O sync automático de Meta Ads falhou porque o <strong>META_ACCESS_TOKEN</strong> expirou.</p>
+                  <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:16px 0">
+                    <p style="margin:0;color:#991b1b;font-size:14px"><strong>Erro:</strong> ${error.message?.slice(0, 200)}</p>
+                    <p style="margin:8px 0 0;color:#991b1b;font-size:14px"><strong>Data:</strong> ${new Date().toISOString()}</p>
+                  </div>
+                  <h3>Como resolver:</h3>
+                  <ol>
+                    <li>Acesse o <a href="https://business.facebook.com/settings/system-users">Meta Business Manager → System Users</a></li>
+                    <li>Gere um novo token com permissões <code>ads_read</code> e <code>read_insights</code></li>
+                    <li>Atualize o secret <strong>META_ACCESS_TOKEN</strong> no Lovable Cloud</li>
+                  </ol>
+                  <p style="color:#6b7280;font-size:12px">Enquanto o token não for renovado, nenhum dado será sincronizado.</p>
+                </div>
+              `,
+            }),
+          });
+          console.log('[SYNC] ✅ E-mail de alerta de token expirado enviado');
+        }
+      } catch (emailErr) {
+        console.error('[SYNC] Falha ao enviar e-mail de alerta:', emailErr);
+      }
+    }
+
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
