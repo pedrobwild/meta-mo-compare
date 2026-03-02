@@ -35,3 +35,12 @@ verify_jwt = false
 
 [functions.analyze-creative]
 verify_jwt = false
+
+[functions.generate-funnel-snapshot]
+verify_jwt = false
+
+[functions.receive-crm-webhook]
+verify_jwt = false
+
+[functions.analyze-funnel]
+verify_jwt = false
