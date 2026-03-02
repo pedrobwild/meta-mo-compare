@@ -25,6 +25,7 @@ import autoTable from 'jspdf-autotable';
 import type { MetaRecord } from '@/lib/types';
 
 type AINarrative = {
+  resumo_executivo: string;
   o_que_mudou: string;
   por_que: string;
   o_que_faremos: string;
@@ -124,6 +125,7 @@ export default function ReportView() {
       spend: row.metrics.spend_brl,
       results: row.metrics.results,
       cpa: row.metrics.cost_per_result,
+      ctr: row.metrics.ctr_link,
     }));
 
     // Top 5 campaigns for context
@@ -137,9 +139,28 @@ export default function ReportView() {
         cpa: r.metrics.cost_per_result,
         ctr: r.metrics.ctr_link,
         impressions: r.metrics.impressions,
+        status: r.status,
       }));
 
-    return { summary, highlights, recommendations, cm, pm, periodLabel, compLabel, rows, verdicts, explanations, autoRecs, top5 };
+    // Top/bottom 3 ads for creative highlights
+    const adRows = groupByLevel(current, previous, 'ad', '', false);
+    const sortedAds = [...adRows].sort((a, b) => b.metrics.ctr_link - a.metrics.ctr_link);
+    const topAds = sortedAds.slice(0, 3).map(r => ({
+      name: r.name,
+      ctr: r.metrics.ctr_link,
+      cpa: r.metrics.cost_per_result,
+      spend: r.metrics.spend_brl,
+      results: r.metrics.results,
+    }));
+    const bottomAds = sortedAds.filter(a => a.metrics.spend_brl > 0).slice(-3).reverse().map(r => ({
+      name: r.name,
+      ctr: r.metrics.ctr_link,
+      cpa: r.metrics.cost_per_result,
+      spend: r.metrics.spend_brl,
+      results: r.metrics.results,
+    }));
+
+    return { summary, highlights, recommendations, cm, pm, periodLabel, compLabel, rows, verdicts, explanations, autoRecs, top5, topAds, bottomAds };
   }, [current, previous, state]);
 
   const generateAINarrative = async () => {
@@ -161,6 +182,7 @@ export default function ReportView() {
           frequencia: report.cm.frequency,
           lpv_rate: report.cm.lpv_rate,
           landing_page_views: report.cm.landing_page_views,
+          roas: report.cm.spend_brl > 0 ? report.cm.results / report.cm.spend_brl : 0,
         },
         metricas_anteriores: report.pm ? {
           investimento: report.pm.spend_brl,
@@ -172,8 +194,10 @@ export default function ReportView() {
           cpc_link: report.pm.cpc_link,
           cpm: report.pm.cpm,
           frequencia: report.pm.frequency,
+          roas: report.pm.spend_brl > 0 ? report.pm.results / report.pm.spend_brl : 0,
         } : null,
         top5_campanhas: report.top5,
+        alertas: report.highlights.negative,
         destaques_positivos: report.highlights.positive,
         pontos_atencao: report.highlights.negative,
         variacoes: report.explanations.map(e => ({
@@ -203,93 +227,96 @@ export default function ReportView() {
   const exportPDF = () => {
     if (!report) return;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    let y = 15;
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    let y = 0;
 
-    doc.setFontSize(18);
+    // ═══════════════════════════════════════════════════
+    // CAPA
+    // ═══════════════════════════════════════════════════
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(0, 0, pageW, pageH, 'F');
+
+    // Logo text "bwild"
+    doc.setFontSize(36);
     doc.setFont('helvetica', 'bold');
-    doc.text('Meta Ads — Relatório Executivo', 14, y);
-    y += 8;
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100);
-    doc.text(`${report.periodLabel}${report.compLabel ? ` vs ${report.compLabel}` : ''}`, 14, y);
-    y += 10;
+    doc.setTextColor(59, 130, 246); // blue-500
+    doc.text('bwild', pageW / 2, 80, { align: 'center' });
 
-    doc.setTextColor(0);
+    // Subtitle
     doc.setFontSize(10);
-    const summaryLines = doc.splitTextToSize(report.summary, 180);
-    doc.text(summaryLines, 14, y);
-    y += summaryLines.length * 5 + 5;
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.text('AGÊNCIA DE PERFORMANCE', pageW / 2, 90, { align: 'center' });
 
-    // ─── AI Narrative sections (if generated) ───
-    if (aiNarrative) {
-      const sections = [
-        { title: 'O que mudou (Análise IA)', content: aiNarrative.o_que_mudou },
-        { title: 'Por quê (Análise IA)', content: aiNarrative.por_que },
-        { title: 'O que faremos (Análise IA)', content: aiNarrative.o_que_faremos },
-      ];
+    // Title
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('Relatório de Performance', pageW / 2, 130, { align: 'center' });
+    doc.setFontSize(18);
+    doc.text('Meta Ads', pageW / 2, 142, { align: 'center' });
 
-      for (const section of sections) {
-        if (y > 240) { doc.addPage(); y = 15; }
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(30, 100, 200);
-        doc.text(section.title, 14, y);
-        y += 6;
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(0);
-        const lines = doc.splitTextToSize(section.content, 180);
-        doc.text(lines, 14, y);
-        y += lines.length * 4 + 6;
-      }
-    } else {
-      // Fallback: rule-based sections
-      if (report.explanations.length > 0) {
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text('O que mudou', 14, y);
-        y += 6;
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        report.explanations.forEach(exp => {
-          const lines = doc.splitTextToSize(exp.narrative, 180);
-          doc.text(lines, 14, y);
-          y += lines.length * 4 + 3;
-        });
-        y += 3;
-      }
+    // Divider
+    doc.setDrawColor(59, 130, 246);
+    doc.setLineWidth(0.5);
+    doc.line(pageW / 2 - 30, 152, pageW / 2 + 30, 152);
 
-      if (report.autoRecs.length > 0) {
-        if (y > 250) { doc.addPage(); y = 15; }
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text('O que faremos', 14, y);
-        y += 6;
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        report.autoRecs.forEach((rec, i) => {
-          const title = `${i + 1}. ${rec.title}`;
-          doc.text(title, 14, y);
-          y += 4;
-          const whyLines = doc.splitTextToSize(`  Por quê: ${rec.why}`, 175);
-          doc.text(whyLines, 14, y);
-          y += whyLines.length * 4;
-          const whatLines = doc.splitTextToSize(`  Ação: ${rec.what_to_do}`, 175);
-          doc.text(whatLines, 14, y);
-          y += whatLines.length * 4 + 2;
-        });
-        y += 3;
-      }
+    // Period
+    doc.setFontSize(12);
+    doc.setTextColor(203, 213, 225); // slate-300
+    doc.text(report.periodLabel, pageW / 2, 165, { align: 'center' });
+    if (report.compLabel) {
+      doc.setFontSize(10);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`vs ${report.compLabel}`, pageW / 2, 173, { align: 'center' });
     }
 
-    // ─── KPIs table ───
-    if (y > 240) { doc.addPage(); y = 15; }
-    doc.setTextColor(0);
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('KPIs', 14, y);
-    y += 2;
+    // Generation date
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139); // slate-500
+    const genDate = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+    doc.text(`Gerado em ${genDate}`, pageW / 2, 200, { align: 'center' });
+
+    // ═══════════════════════════════════════════════════
+    // PAGE 2: Resumo Executivo
+    // ═══════════════════════════════════════════════════
+    doc.addPage();
+    y = 20;
+
+    const sectionTitle = (title: string, color: [number, number, number] = [59, 130, 246]) => {
+      if (y > 260) { doc.addPage(); y = 20; }
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...color);
+      doc.text(title, 14, y);
+      y += 2;
+      doc.setDrawColor(...color);
+      doc.setLineWidth(0.3);
+      doc.line(14, y, 80, y);
+      y += 6;
+    };
+
+    const bodyText = (text: string, maxW = 180) => {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(30, 30, 30);
+      const lines = doc.splitTextToSize(text, maxW);
+      if (y + lines.length * 5 > 275) { doc.addPage(); y = 20; }
+      doc.text(lines, 14, y);
+      y += lines.length * 5 + 4;
+    };
+
+    sectionTitle('1. Resumo Executivo');
+    if (aiNarrative?.resumo_executivo) {
+      bodyText(aiNarrative.resumo_executivo);
+    } else {
+      bodyText(report.summary);
+    }
+
+    // ═══════════════════════════════════════════════════
+    // 2. KPIs Principais
+    // ═══════════════════════════════════════════════════
+    sectionTitle('2. KPIs Principais');
 
     const kpiData = METRIC_DEFS.slice(0, 12).map(def => {
       const val = (report.cm as any)[def.key] ?? 0;
@@ -299,7 +326,7 @@ export default function ReportView() {
         : '—';
       const benchmarks = VERTICALS[DEFAULT_VERTICAL];
       const status = getBenchmarkStatus(def.key, val, benchmarks);
-      const statusEmoji = status === 'good' ? '✅' : status === 'warning' ? '⚠️' : status === 'bad' ? '🔴' : '';
+      const statusEmoji = status === 'good' ? '🟢' : status === 'warning' ? '🟡' : status === 'bad' ? '🔴' : '⚪';
       return [def.label, def.format(val), prevVal !== null ? def.format(prevVal) : '—', delta, statusEmoji];
     });
 
@@ -308,53 +335,173 @@ export default function ReportView() {
       head: [['Métrica', 'Atual', 'Anterior', 'Δ %', 'Status']],
       body: kpiData,
       theme: 'grid',
-      headStyles: { fillColor: [30, 144, 255], textColor: 255, fontSize: 9 },
+      headStyles: { fillColor: [59, 130, 246], textColor: 255, fontSize: 9, fontStyle: 'bold' },
       bodyStyles: { fontSize: 8 },
       margin: { left: 14, right: 14 },
+      alternateRowStyles: { fillColor: [245, 247, 250] },
     });
+    y = (doc as any).lastAutoTable.finalY + 10;
 
-    y = (doc as any).lastAutoTable.finalY + 8;
+    // ═══════════════════════════════════════════════════
+    // 3. O que mudou
+    // ═══════════════════════════════════════════════════
+    sectionTitle('3. O que mudou');
+    if (aiNarrative?.o_que_mudou) {
+      bodyText(aiNarrative.o_que_mudou);
+    } else if (report.explanations.length > 0) {
+      report.explanations.forEach(exp => {
+        bodyText(exp.narrative);
+      });
+    } else {
+      bodyText('Sem variações significativas no período.');
+    }
 
-    // ─── Top 5 Campaigns ───
+    // ═══════════════════════════════════════════════════
+    // 4. Por quê
+    // ═══════════════════════════════════════════════════
+    sectionTitle('4. Por quê', [245, 158, 11]);
+    if (aiNarrative?.por_que) {
+      bodyText(aiNarrative.por_que);
+    } else {
+      bodyText('Análise de drivers não disponível. Gere a narrativa com IA para obter esta seção.');
+    }
+
+    // ═══════════════════════════════════════════════════
+    // 5. Top 5 Campanhas
+    // ═══════════════════════════════════════════════════
+    sectionTitle('5. Top 5 Campanhas');
+
     if (report.top5.length > 0) {
-      if (y > 230) { doc.addPage(); y = 15; }
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Top 5 Campanhas por Investimento', 14, y);
-      y += 2;
-
       const top5Data = report.top5.map(c => [
         c.name.length > 35 ? c.name.slice(0, 35) + '…' : c.name,
         `R$${c.spend.toFixed(2)}`,
         `${c.results}`,
         `R$${c.cpa.toFixed(2)}`,
         `${c.ctr.toFixed(2)}%`,
+        c.status === 'active' ? '🟢 Ativo' : '⚪ Inativo',
       ]);
 
       autoTable(doc, {
         startY: y,
-        head: [['Campanha', 'Invest.', 'Result.', 'CPA', 'CTR']],
+        head: [['Campanha', 'Investimento', 'Resultados', 'CPA', 'CTR', 'Status']],
         body: top5Data,
         theme: 'grid',
-        headStyles: { fillColor: [30, 144, 255], textColor: 255, fontSize: 9 },
+        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontSize: 9, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 8 },
+        margin: { left: 14, right: 14 },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+      });
+      y = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // ═══════════════════════════════════════════════════
+    // 6. Criativos em Destaque
+    // ═══════════════════════════════════════════════════
+    sectionTitle('6. Criativos em Destaque', [16, 185, 129]);
+
+    if (report.topAds.length > 0) {
+      if (y > 240) { doc.addPage(); y = 20; }
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(16, 185, 129);
+      doc.text('Top 3 — Melhor Performance', 14, y);
+      y += 5;
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Anúncio', 'CTR', 'CPA', 'Invest.', 'Result.']],
+        body: report.topAds.map(a => [
+          a.name.length > 40 ? a.name.slice(0, 40) + '…' : a.name,
+          `${a.ctr.toFixed(2)}%`,
+          `R$${a.cpa.toFixed(2)}`,
+          `R$${a.spend.toFixed(2)}`,
+          `${a.results}`,
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [16, 185, 129], textColor: 255, fontSize: 9 },
         bodyStyles: { fontSize: 8 },
         margin: { left: 14, right: 14 },
       });
-
-      y = (doc as any).lastAutoTable.finalY + 8;
+      y = (doc as any).lastAutoTable.finalY + 6;
     }
 
-    // ─── Verdicts ───
-    if (report.verdicts.length > 0) {
-      if (y > 230) { doc.addPage(); y = 15; }
-      doc.setFontSize(12);
+    if (report.bottomAds.length > 0) {
+      if (y > 240) { doc.addPage(); y = 20; }
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-      doc.text('Semáforo por Campanha', 14, y);
-      y += 2;
+      doc.setTextColor(239, 68, 68);
+      doc.text('Bottom 3 — Pior Performance', 14, y);
+      y += 5;
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Anúncio', 'CTR', 'CPA', 'Invest.', 'Result.']],
+        body: report.bottomAds.map(a => [
+          a.name.length > 40 ? a.name.slice(0, 40) + '…' : a.name,
+          `${a.ctr.toFixed(2)}%`,
+          `R$${a.cpa.toFixed(2)}`,
+          `R$${a.spend.toFixed(2)}`,
+          `${a.results}`,
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [239, 68, 68], textColor: 255, fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        margin: { left: 14, right: 14 },
+      });
+      y = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // ═══════════════════════════════════════════════════
+    // 7. Alertas do Período
+    // ═══════════════════════════════════════════════════
+    sectionTitle('7. Alertas do Período', [239, 68, 68]);
+
+    if (report.highlights.negative.length > 0 || report.highlights.positive.length > 0) {
+      const alertData = [
+        ...report.highlights.negative.map(h => ['🔴', h, 'Atenção']),
+        ...report.highlights.positive.map(h => ['🟢', h, 'OK']),
+      ];
+
+      autoTable(doc, {
+        startY: y,
+        head: [['', 'Alerta', 'Status']],
+        body: alertData,
+        theme: 'grid',
+        headStyles: { fillColor: [239, 68, 68], textColor: 255, fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        margin: { left: 14, right: 14 },
+        columnStyles: { 0: { cellWidth: 10 }, 2: { cellWidth: 20 } },
+      });
+      y = (doc as any).lastAutoTable.finalY + 10;
+    } else {
+      bodyText('Nenhum alerta registrado no período.');
+    }
+
+    // ═══════════════════════════════════════════════════
+    // 8. O que faremos
+    // ═══════════════════════════════════════════════════
+    sectionTitle('8. O que faremos', [16, 185, 129]);
+    if (aiNarrative?.o_que_faremos) {
+      bodyText(aiNarrative.o_que_faremos);
+    } else if (report.autoRecs.length > 0) {
+      report.autoRecs.forEach((rec, i) => {
+        bodyText(`${i + 1}. ${rec.title}\n   Por quê: ${rec.why}\n   Ação: ${rec.what_to_do}`);
+      });
+    } else {
+      report.recommendations.forEach((r, i) => {
+        bodyText(`${i + 1}. ${r}`);
+      });
+    }
+
+    // ═══════════════════════════════════════════════════
+    // 9. Semáforo por Campanha (Log de Decisões)
+    // ═══════════════════════════════════════════════════
+    if (report.verdicts.length > 0) {
+      sectionTitle('9. Log de Decisões — Semáforo');
 
       const verdictData = report.verdicts.map(v => [
         `${v.verdict.emoji} ${v.verdict.label}`,
-        v.name,
+        v.name.length > 30 ? v.name.slice(0, 30) + '…' : v.name,
         `R$${v.spend.toFixed(2)}`,
         `${v.results}`,
         `R$${v.cpa.toFixed(2)}`,
@@ -366,28 +513,29 @@ export default function ReportView() {
         head: [['Veredito', 'Campanha', 'Invest.', 'Result.', 'CPA', 'Score']],
         body: verdictData,
         theme: 'grid',
-        headStyles: { fillColor: [30, 144, 255], textColor: 255, fontSize: 9 },
+        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontSize: 9, fontStyle: 'bold' },
         bodyStyles: { fontSize: 8 },
         margin: { left: 14, right: 14 },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
       });
-
-      y = (doc as any).lastAutoTable.finalY + 8;
+      y = (doc as any).lastAutoTable.finalY + 10;
     }
 
-    // ─── Recommendations ───
-    if (y > 250) { doc.addPage(); y = 15; }
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Recomendações', 14, y);
-    y += 6;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    report.recommendations.forEach((r, i) => {
-      doc.text(`${i + 1}. ${r}`, 14, y);
-      y += 5;
-    });
+    // ═══════════════════════════════════════════════════
+    // Footer on every page
+    // ═══════════════════════════════════════════════════
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 2; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(7);
+      doc.setTextColor(150);
+      doc.text(`bwild — Relatório de Performance Meta Ads`, 14, pageH - 8);
+      doc.text(`Página ${i - 1} de ${totalPages - 1}`, pageW - 14, pageH - 8, { align: 'right' });
+    }
 
-    doc.save(`relatorio-meta-ads-${state.dateFrom || 'report'}.pdf`);
+    const dateSlug = `${state.dateFrom || 'inicio'}-${state.dateTo || 'fim'}`;
+    doc.save(`relatorio-bwild-${dateSlug}.pdf`);
+    toast.success('PDF gerado com sucesso!');
   };
 
   if (!report) return <p className="text-muted-foreground text-center py-8">Selecione um período nos filtros</p>;
@@ -403,31 +551,47 @@ export default function ReportView() {
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={generateAINarrative} disabled={isGenerating}>
             {isGenerating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
-            {aiNarrative ? 'Regerar IA' : 'Gerar Narrativa IA'}
+            {isGenerating ? 'Claude está analisando...' : aiNarrative ? 'Regerar Narrativa IA' : 'Gerar Narrativa IA'}
           </Button>
           <Button size="sm" onClick={exportPDF}>
-            <Download className="h-4 w-4 mr-1" /> PDF
+            <Download className="h-4 w-4 mr-1" /> Gerar Relatório PDF
           </Button>
         </div>
       </div>
 
+      {/* Loading state */}
+      {isGenerating && (
+        <div className="glass-card p-6 text-center space-y-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-sm text-muted-foreground">Claude está analisando seus dados...</p>
+          <p className="text-xs text-muted-foreground/60">Gerando resumo executivo, análise de variações e recomendações</p>
+        </div>
+      )}
+
       {/* Resumo Executivo */}
       <div className="glass-card p-5">
-        <h3 className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wider">Resumo Executivo</h3>
-        <p className="text-foreground leading-relaxed">{report.summary}</p>
+        <h3 className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wider">1. Resumo Executivo</h3>
+        {aiNarrative?.resumo_executivo ? (
+          <div className="space-y-2">
+            <p className="text-foreground leading-relaxed">{aiNarrative.resumo_executivo}</p>
+            <Badge variant="outline" className="text-[10px]"><Sparkles className="h-3 w-3 mr-1" />Gerado por IA</Badge>
+          </div>
+        ) : (
+          <p className="text-foreground leading-relaxed">{report.summary}</p>
+        )}
       </div>
 
       {/* ─── AI NARRATIVE SECTIONS ─── */}
       {aiNarrative && (
         <div className="space-y-4">
           {[
-            { title: 'O que mudou', content: aiNarrative.o_que_mudou, icon: <MessageSquare className="h-4 w-4" />, borderColor: 'border-l-primary/50', titleColor: 'text-primary' },
-            { title: 'Por quê', content: aiNarrative.por_que, icon: <Lightbulb className="h-4 w-4" />, borderColor: 'border-l-amber-500/50', titleColor: 'text-amber-400' },
-            { title: 'O que faremos', content: aiNarrative.o_que_faremos, icon: <CheckCircle2 className="h-4 w-4" />, borderColor: 'border-l-emerald-500/50', titleColor: 'text-emerald-400' },
+            { num: '3', title: 'O que mudou', content: aiNarrative.o_que_mudou, icon: <MessageSquare className="h-4 w-4" />, borderColor: 'border-l-primary/50', titleColor: 'text-primary' },
+            { num: '4', title: 'Por quê', content: aiNarrative.por_que, icon: <Lightbulb className="h-4 w-4" />, borderColor: 'border-l-amber-500/50', titleColor: 'text-amber-400' },
+            { num: '8', title: 'O que faremos', content: aiNarrative.o_que_faremos, icon: <CheckCircle2 className="h-4 w-4" />, borderColor: 'border-l-emerald-500/50', titleColor: 'text-emerald-400' },
           ].map((section, idx) => (
             <div key={idx} className={`glass-card p-5 border-l-2 ${section.borderColor}`}>
               <h3 className={`text-sm font-medium ${section.titleColor} mb-3 uppercase tracking-wider flex items-center gap-2`}>
-                {section.icon} {section.title}
+                {section.icon} {section.num}. {section.title}
                 <Badge variant="outline" className="text-[10px] ml-auto"><Sparkles className="h-3 w-3 mr-1" />IA</Badge>
               </h3>
               <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{section.content}</p>
@@ -440,7 +604,7 @@ export default function ReportView() {
       {!aiNarrative && report.explanations.length > 0 && (
         <div className="glass-card p-5 border-l-2 border-l-primary/50">
           <h3 className="text-sm font-medium text-primary mb-4 uppercase tracking-wider flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" /> O que mudou
+            <MessageSquare className="h-4 w-4" /> 3. O que mudou
           </h3>
           <div className="space-y-4">
             {report.explanations.map((exp, idx) => (
@@ -516,7 +680,7 @@ export default function ReportView() {
       {!aiNarrative && report.autoRecs.length > 0 && (
         <div className="glass-card p-5 border-l-2 border-l-amber-500/50">
           <h3 className="text-sm font-medium text-amber-400 mb-4 uppercase tracking-wider flex items-center gap-2">
-            <Lightbulb className="h-4 w-4" /> O que faremos
+            <Lightbulb className="h-4 w-4" /> 8. O que faremos
           </h3>
           <div className="space-y-4">
             {report.autoRecs.map((rec, i) => (
@@ -540,7 +704,7 @@ export default function ReportView() {
       {/* Semáforo */}
       {report.verdicts.length > 0 && (
         <div className="glass-card p-5">
-          <h3 className="text-sm font-medium text-foreground mb-3 uppercase tracking-wider">Semáforo por Campanha</h3>
+          <h3 className="text-sm font-medium text-foreground mb-3 uppercase tracking-wider">9. Semáforo por Campanha</h3>
           <div className="space-y-2">
             {report.verdicts.map(v => (
               <div key={v.name} className="flex items-center gap-3 p-2 rounded-md bg-secondary/30">
