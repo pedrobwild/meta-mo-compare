@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar, type Tab } from '@/components/AppSidebar';
+import MetaTopbar from '@/components/MetaTopbar';
 import CommandHeader from '@/components/CommandHeader';
 import OverviewCards from '@/components/OverviewCards';
 import HeatmapTable from '@/components/HeatmapTable';
@@ -48,30 +49,27 @@ function EmptyState() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="text-center space-y-8 max-w-lg mx-auto px-4"
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="text-center space-y-6 max-w-md mx-auto px-4"
       >
-        <div className="relative">
-          <div className="h-24 w-24 mx-auto rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center glow-primary">
-            <Cloud className="h-12 w-12 text-primary" />
-          </div>
-          <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary/40 animate-pulse" />
+        <div className="h-16 w-16 mx-auto rounded-meta-card bg-accent flex items-center justify-center">
+          <Cloud className="h-8 w-8 text-primary" strokeWidth={1.5} />
         </div>
-        <div className="space-y-3">
-          <h2 className="text-2xl font-bold text-foreground tracking-tight">
-            Meta Ads <span className="text-gradient-primary">Command Center</span>
+        <div className="space-y-2">
+          <h2 className="text-meta-title text-foreground">
+            Meta Ads <span className="text-primary">Command Center</span>
           </h2>
-          <p className="text-sm text-muted-foreground leading-relaxed">
+          <p className="text-meta-body text-muted-foreground leading-relaxed">
             Conecte seus dados do Meta Ads para desbloquear análises de performance, alertas inteligentes e recomendações acionáveis.
           </p>
         </div>
         <MetaSyncButton />
-        <div className="flex items-center justify-center gap-6 text-[10px] text-muted-foreground/50 uppercase tracking-widest">
+        <div className="flex items-center justify-center gap-6 text-meta-label text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <Zap className="h-3 w-3" /> Alertas em tempo real
+            <Zap className="h-3 w-3" strokeWidth={1.5} /> Alertas em tempo real
           </span>
           <span className="flex items-center gap-1.5">
-            <BarChart3 className="h-3 w-3" /> Análise profunda
+            <BarChart3 className="h-3 w-3" strokeWidth={1.5} /> Análise profunda
           </span>
         </div>
       </motion.div>
@@ -84,7 +82,7 @@ function ViewContainer({ children }: { children: React.ReactNode }) {
     <motion.div
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
+      transition={{ duration: 0.2 }}
       className="space-y-4"
     >
       {children}
@@ -100,11 +98,10 @@ function DashboardContent() {
   const hasData = state.records.length > 0;
   const { filter: crossFilter, clearFilter } = useCrossFilter();
 
-  // Show auth if not logged in
   if (wsLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground text-sm">Carregando...</div>
+        <div className="text-muted-foreground text-meta-body">Carregando...</div>
       </div>
     );
   }
@@ -123,12 +120,16 @@ function DashboardContent() {
         <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
         <div className="flex-1 flex flex-col min-w-0">
+          {/* Meta-style dual topbar */}
+          <MetaTopbar activeTab={activeTab} onTabChange={setActiveTab} />
+
+          {/* Filter bar */}
           <CommandHeader />
 
-          <main className="flex-1 p-4 overflow-y-auto">
+          <main className="flex-1 p-4 overflow-y-auto bg-background">
             {crossFilter.key && (
               <div className="mb-3 flex items-center gap-2">
-                <Badge variant="secondary" className="text-xs flex items-center gap-1.5 px-2.5 py-1">
+                <Badge variant="secondary" className="text-meta-caption flex items-center gap-1.5 px-2.5 py-1 rounded-meta-pill border border-border">
                   Filtrando: <span className="font-semibold">{crossFilter.name}</span>
                   <button onClick={clearFilter} className="ml-1 hover:text-destructive"><X className="h-3 w-3" /></button>
                 </Badge>
@@ -168,9 +169,10 @@ function DashboardContent() {
 
               {(activeTab === 'tactical' || activeTab === 'diagnostic' || activeTab === 'simulator' || activeTab === 'creatives') && !hasData && (
                 <ViewContainer key="nodata">
-                  <div className="text-center py-20 space-y-4">
-                    <BarChart3 className="h-16 w-16 text-muted-foreground/20 mx-auto" />
-                    <p className="text-sm text-muted-foreground">Sincronize dados para acessar esta visualização</p>
+                  <div className="text-center py-20 space-y-4 bg-card border border-border rounded-meta-card">
+                    <BarChart3 className="h-16 w-16 text-muted-foreground/20 mx-auto" strokeWidth={1.5} />
+                    <p className="text-meta-heading-sm text-foreground">Dados não disponíveis</p>
+                    <p className="text-meta-body text-muted-foreground">Sincronize com o Meta para carregar os dados</p>
                     <MetaSyncButton />
                   </div>
                 </ViewContainer>
@@ -232,9 +234,9 @@ function DashboardContent() {
         {!chatOpen && (
           <button
             onClick={() => setChatOpen(true)}
-            className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+            className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-meta-card hover:shadow-meta-modal flex items-center justify-center transition-all meta-button-press"
           >
-            <Bot className="h-5 w-5" />
+            <Bot className="h-5 w-5" strokeWidth={1.5} />
           </button>
         )}
 

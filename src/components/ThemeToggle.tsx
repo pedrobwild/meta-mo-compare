@@ -3,14 +3,15 @@ import { Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function ThemeToggle() {
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('theme');
-    if (stored === 'light') {
-      setIsDark(false);
+    if (stored === 'dark') {
+      setIsDark(true);
+      document.documentElement.classList.add('dark');
+    } else {
       document.documentElement.classList.remove('dark');
-      document.documentElement.classList.add('light');
     }
   }, []);
 
@@ -18,19 +19,22 @@ export default function ThemeToggle() {
     const next = !isDark;
     setIsDark(next);
     if (next) {
-      document.documentElement.classList.remove('light');
       document.documentElement.classList.add('dark');
       localStorage.setItem('theme', 'dark');
     } else {
       document.documentElement.classList.remove('dark');
-      document.documentElement.classList.add('light');
       localStorage.setItem('theme', 'light');
     }
   };
 
   return (
-    <Button variant="ghost" size="sm" onClick={toggle} className="text-muted-foreground hover:text-foreground">
-      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={toggle}
+      className="h-7 w-7 text-white/70 hover:text-white hover:bg-white/10 rounded-meta-btn"
+    >
+      {isDark ? <Sun className="h-4 w-4" strokeWidth={1.5} /> : <Moon className="h-4 w-4" strokeWidth={1.5} />}
     </Button>
   );
 }
