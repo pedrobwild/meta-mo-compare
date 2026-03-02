@@ -21,12 +21,10 @@ export default function AlertsBanner() {
 
   const alerts = useMemo((): Alert[] => {
     if (current.length === 0) return [];
-
     const metrics = aggregateMetrics(current);
     const benchmarks = VERTICALS[DEFAULT_VERTICAL];
     const result: Alert[] = [];
 
-    // CPA above target — find matching target
     const targets = state.targets.find(t => t.period_key === state.dateFrom);
     if (targets?.cost_per_result && metrics.cost_per_result > targets.cost_per_result * 1.2) {
       result.push({
@@ -79,23 +77,23 @@ export default function AlertsBanner() {
       {visible.map(alert => (
         <div
           key={alert.id}
-          className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border ${
+          className={`flex items-center gap-3 px-4 py-3 rounded-meta-card border-l-[3px] bg-card border border-border shadow-meta-subtle ${
             alert.severity === 'critical'
-              ? 'bg-negative/10 border-negative/30 text-negative'
-              : 'bg-warning/10 border-warning/30 text-warning'
+              ? 'border-l-destructive'
+              : 'border-l-warning'
           }`}
         >
           {alert.severity === 'critical' ? (
-            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+            <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" strokeWidth={1.5} />
           ) : (
-            <Bell className="h-4 w-4 flex-shrink-0" />
+            <Bell className="h-4 w-4 text-warning flex-shrink-0" strokeWidth={1.5} />
           )}
-          <span className="text-xs font-medium flex-1">{alert.message}</span>
+          <span className="text-meta-body font-medium flex-1 text-foreground">{alert.message}</span>
           <button
             onClick={() => setDismissed(prev => new Set([...prev, alert.id]))}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground hover:bg-secondary rounded-meta-btn p-1 transition-colors"
           >
-            <X className="h-3.5 w-3.5" />
+            <X className="h-3.5 w-3.5" strokeWidth={1.5} />
           </button>
         </div>
       ))}
