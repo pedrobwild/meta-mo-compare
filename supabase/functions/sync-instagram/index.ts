@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
       if (!igUserId) throw new Error('Missing ig_user_id for sending messages');
 
       // Send via IG Messaging API
-      const sendUrl = `https://graph.facebook.com/v21.0/${igUserId}/messages`;
+      const sendUrl = `https://graph.facebook.com/v22.0/${igUserId}/messages`;
       const sendRes = await fetchWithRetry(sendUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
       if (adAccountId) {
         const accId = adAccountId.startsWith('act_') ? adAccountId : `act_${adAccountId}`;
         try {
-          const pagesUrl = `https://graph.facebook.com/v21.0/${accId}?fields=owned_pages{instagram_business_account}&access_token=${accessToken}`;
+          const pagesUrl = `https://graph.facebook.com/v22.0/${accId}?fields=owned_pages{instagram_business_account}&access_token=${accessToken}`;
           const pagesRes = await fetchWithRetry(pagesUrl);
           const pagesJson = await pagesRes.json();
           const pages = pagesJson.owned_pages?.data || [];
@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
       // Fallback: try /me/accounts
       if (!igUserId) {
         try {
-          const meUrl = `https://graph.facebook.com/v21.0/me/accounts?fields=instagram_business_account&access_token=${accessToken}`;
+          const meUrl = `https://graph.facebook.com/v22.0/me/accounts?fields=instagram_business_account&access_token=${accessToken}`;
           const meRes = await fetchWithRetry(meUrl);
           const meJson = await meRes.json();
           for (const page of meJson.data || []) {
@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
     };
 
     // ─── STEP 2: Fetch media (posts) ───
-    const mediaUrl = `https://graph.facebook.com/v21.0/${igUserId}/media?fields=id,media_type,media_url,thumbnail_url,permalink,caption,timestamp,like_count,comments_count&limit=50&access_token=${accessToken}`;
+    const mediaUrl = `https://graph.facebook.com/v22.0/${igUserId}/media?fields=id,media_type,media_url,thumbnail_url,permalink,caption,timestamp,like_count,comments_count&limit=50&access_token=${accessToken}`;
     const mediaItems = await fetchAllPages(mediaUrl);
     results.media.fetched = mediaItems.length;
     console.log(`[IG] ${mediaItems.length} media posts fetched`);
@@ -178,24 +178,35 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ─── STEP 3: Fetch insights for each media ───
-    for (const m of mediaItems) {
+    // ─── STEP 3: Fetch insights for recent media (limit 50 to avoid timeout) ───
+    // Filter: only IMAGE, VIDEO, REELS, CAROUSEL_ALBUM support insights (not STORY older than 24h)
+    const insightEligible = mediaItems
+      .filter((m: any) => ['IMAGE', 'VIDEO', 'REELS', 'CAROUSEL_ALBUM'].includes(m.media_type))
+      .slice(0, 50); // limit to 50 most recent
+
+    console.log(`[IG] Fetching insights for ${insightEligible.length}/${mediaItems.length} eligible posts`);
+
+    for (const m of insightEligible) {
       try {
-        const isVideo = m.media_type === 'VIDEO' || m.media_type === 'REELS';
-        const metricsParam = isVideo
-          ? 'impressions,reach,saved,shares,video_views'
-          : 'impressions,reach,saved,shares';
+        // v22.0: 'impressions' deprecated → use 'views'; 'video_views' deprecated
+        const metricsParam = 'views,reach,saved,shares';
 
-        const insightsUrl = `https://graph.facebook.com/v21.0/${m.id}/insights?metric=${metricsParam}&access_token=${accessToken}`;
-        const insightsRes = await fetchWithRetry(insightsUrl);
-        const insightsJson = await insightsRes.json();
+        const insightsUrl = `https://graph.facebook.com/v22.0/${m.id}/insights?metric=${metricsParam}&access_token=${accessToken}`;
+        const insightsRes = await fetch(insightsUrl);
+        const insightsText = await insightsRes.text();
+        
+        if (!insightsRes.ok) {
+          // Skip silently - some media types don't support all metrics
+          results.insights.fetched++;
+          continue;
+        }
 
+        const insightsJson = JSON.parse(insightsText);
         const metrics: Record<string, number> = {};
         for (const d of insightsJson.data || []) {
           metrics[d.name] = d.values?.[0]?.value || 0;
         }
 
-        // Engagement = likes + comments + saved + shares
         const engagement = (m.like_count || 0) + (m.comments_count || 0) + (metrics.saved || 0) + (metrics.shares || 0);
 
         const { error } = await supabase
@@ -203,20 +214,19 @@ Deno.serve(async (req) => {
           .upsert({
             workspace_id: workspaceId,
             media_id: m.id,
-            impressions: metrics.impressions || 0,
+            impressions: metrics.views || 0,
             reach: metrics.reach || 0,
             engagement,
             saved: metrics.saved || 0,
             shares: metrics.shares || 0,
-            video_views: metrics.video_views || 0,
+            video_views: metrics.views || 0,
             updated_at: new Date().toISOString(),
           }, { onConflict: 'workspace_id,media_id' });
 
         if (!error) results.insights.upserted++;
         results.insights.fetched++;
       } catch (e: any) {
-        // Insights may fail for stories or carousel children
-        console.log(`[IG] Insight skip for ${m.id}: ${e.message?.slice(0, 80)}`);
+        results.insights.fetched++;
       }
     }
 
@@ -224,7 +234,7 @@ Deno.serve(async (req) => {
 
     // ─── STEP 4: Fetch conversations (DMs) ───
     try {
-      const convoUrl = `https://graph.facebook.com/v21.0/${igUserId}/conversations?fields=id,participants,updated_time&platform=instagram&limit=50&access_token=${accessToken}`;
+      const convoUrl = `https://graph.facebook.com/v22.0/${igUserId}/conversations?fields=id,participants,updated_time&platform=instagram&limit=50&access_token=${accessToken}`;
       const convos = await fetchAllPages(convoUrl);
       results.conversations.fetched = convos.length;
       console.log(`[IG] ${convos.length} conversations fetched`);
@@ -249,7 +259,7 @@ Deno.serve(async (req) => {
 
         // Fetch messages for this conversation
         try {
-          const msgsUrl = `https://graph.facebook.com/v21.0/${convo.id}?fields=messages{id,message,from,created_time}&access_token=${accessToken}`;
+          const msgsUrl = `https://graph.facebook.com/v22.0/${convo.id}?fields=messages{id,message,from,created_time}&access_token=${accessToken}`;
           const msgsRes = await fetchWithRetry(msgsUrl);
           const msgsJson = await msgsRes.json();
           const messages = msgsJson.messages?.data || [];
