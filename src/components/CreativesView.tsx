@@ -1,209 +1,430 @@
-import { useState, useMemo } from 'react';
-import { AlertTriangle, Edit2, Check, X, Filter, Palette, Sparkles } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { AlertTriangle, Edit2, Check, Filter, Palette, Sparkles, TrendingDown, TrendingUp, BarChart2, Clock, Layers, Bot, Play, Pause, Image, Video, LayoutGrid, Eye } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine, CartesianGrid, Area, AreaChart } from 'recharts';
+import ReactMarkdown from 'react-markdown';
 import { useAppState, useFilteredRecords } from '@/lib/store';
 import { useWorkspace } from '@/lib/workspace';
 import { supabase } from '@/integrations/supabase/client';
-import type { CreativeLifecycleRecord, CreativeStatus, MetaRecord } from '@/lib/types';
-import { CREATIVE_LIFESPAN } from '@/lib/types';
+import type { MetaRecord } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
-const STATUS_CONFIG: Record<CreativeStatus, { label: string; class: string; bgClass: string }> = {
-  fresh: { label: 'FRESH', class: 'text-positive', bgClass: 'bg-positive/15 text-positive border-positive/30' },
-  peaking: { label: 'PEAKING', class: 'text-primary', bgClass: 'bg-primary/15 text-primary border-primary/30' },
-  declining: { label: 'DECLINING', class: 'text-warning', bgClass: 'bg-warning/15 text-warning border-warning/30' },
-  fatigued: { label: 'FATIGUED', class: 'text-destructive', bgClass: 'bg-destructive/15 text-destructive border-destructive/30' },
+// Types
+type LifecycleStage = 'fresh' | 'peaking' | 'declining' | 'fatigued';
+type AngleType = 'dor' | 'prova_social' | 'autoridade' | 'oferta' | 'demonstracao';
+
+interface AdCreative {
+  id: string;
+  workspace_id: string;
+  ad_id: string;
+  ad_name: string;
+  campaign_id: string | null;
+  adset_id: string | null;
+  thumbnail_url: string | null;
+  creative_type: string | null;
+  angle: string | null;
+  hook: string | null;
+  cta: string | null;
+  first_seen_at: string | null;
+  status: string;
+  lifecycle_stage: string;
+  lifecycle_updated_at: string | null;
+  created_at: string;
+}
+
+interface DailyMetric {
+  id: string;
+  ad_id: string;
+  date: string;
+  impressions: number;
+  clicks: number;
+  spend: number;
+  leads: number;
+  ctr: number;
+  cpc: number;
+  cpm: number;
+  cpl: number;
+  frequency: number;
+  reach: number;
+}
+
+interface EnrichedCreative extends AdCreative {
+  daily_metrics: DailyMetric[];
+  days_active: number;
+  total_spend: number;
+  total_leads: number;
+  avg_ctr: number;
+  avg_cpl: number;
+  avg_frequency: number;
+  ctr_first3: number;
+  ctr_last3: number;
+  degradation_pct: number;
+  peak_ctr: number;
+}
+
+// Config
+const STAGE_CONFIG: Record<string, { label: string; badge: string; color: string; bgClass: string; action: string }> = {
+  fresh: { label: 'Novo', badge: '🆕', color: 'text-blue-400', bgClass: 'bg-blue-500/15 text-blue-400 border-blue-500/30', action: 'Aguardar 48h' },
+  peaking: { label: 'Escalando', badge: '🚀', color: 'text-emerald-400', bgClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', action: '🚀 Escalar +20%' },
+  declining: { label: 'Declinando', badge: '⚠️', color: 'text-amber-400', bgClass: 'bg-amber-500/15 text-amber-400 border-amber-500/30', action: '⚠️ Preparar substituto' },
+  fatigued: { label: 'Fadigado', badge: '🔴', color: 'text-red-400', bgClass: 'bg-red-500/15 text-red-400 border-red-500/30', action: '🔴 Pausar agora' },
 };
 
-const FORMAT_OPTIONS = ['video', 'image', 'carousel', 'stories'];
-const HOOK_OPTIONS = ['problema', 'social_proof', 'oferta', 'bastidor'];
+const ANGLE_LABELS: Record<string, string> = {
+  dor: 'Dor',
+  prova_social: 'Prova Social',
+  autoridade: 'Autoridade',
+  oferta: 'Oferta',
+  demonstracao: 'Demonstração',
+};
+
+const TYPE_ICONS: Record<string, any> = {
+  video: Video,
+  image: Image,
+  carousel: LayoutGrid,
+};
 
 function safe(n: number, d: number) { return d > 0 ? n / d : 0; }
-function pct(v: number) { return `${(v * 100).toFixed(2)}%`; }
-function brl(v: number) { return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`; }
+function brl(v: number) { return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; }
 
-interface AdAggregate {
-  ad_key: string;
-  ad_name: string;
-  campaign_key: string | null;
-  campaign_name: string | null;
-  spend_brl: number;
-  impressions: number;
-  link_clicks: number;
-  landing_page_views: number;
-  results: number;
-  ctr_link: number;
-  cpm: number;
-  lpv_rate: number;
-  cpa: number;
-  // Lifecycle data (from creative_lifecycle table or computed)
-  days_active: number;
-  peak_ctr: number;
-  current_ctr: number;
-  degradation_pct: number;
-  status: CreativeStatus;
-  format: string | null;
-  hook_type: string | null;
-  lifecycle_id: string | null;
+function StageBadge({ stage }: { stage: string }) {
+  const cfg = STAGE_CONFIG[stage] || STAGE_CONFIG.fresh;
+  return <Badge variant="outline" className={`text-[10px] font-mono border ${cfg.bgClass}`}>{cfg.badge} {cfg.label}</Badge>;
 }
 
-function computeStatus(days: number, degradation: number, currentCtr: number, peakCtr: number): CreativeStatus {
-  if (days < 7) return 'fresh';
-  if (degradation > 30) return 'fatigued';
-  if (degradation > 15) return 'declining';
-  if (currentCtr >= peakCtr * 0.95) return 'peaking';
-  return 'declining';
-}
-
-function aggregateAds(records: MetaRecord[], lifecycleMap: Map<string, CreativeLifecycleRecord>): AdAggregate[] {
-  const grouped: Record<string, MetaRecord[]> = {};
-  for (const r of records) {
-    (grouped[r.ad_key] ??= []).push(r);
+function enrichCreatives(creatives: AdCreative[], allMetrics: DailyMetric[]): EnrichedCreative[] {
+  const metricsByAd = new Map<string, DailyMetric[]>();
+  for (const m of allMetrics) {
+    const list = metricsByAd.get(m.ad_id) || [];
+    list.push(m);
+    metricsByAd.set(m.ad_id, list);
   }
 
-  return Object.entries(grouped).map(([ad_key, rows]) => {
-    const spend_brl = rows.reduce((s, r) => s + r.spend_brl, 0);
-    const impressions = rows.reduce((s, r) => s + r.impressions, 0);
-    const link_clicks = rows.reduce((s, r) => s + r.link_clicks, 0);
-    const landing_page_views = rows.reduce((s, r) => s + r.landing_page_views, 0);
-    const results = rows.reduce((s, r) => s + r.results, 0);
-    const ctr_link = safe(link_clicks, impressions) * 100;
-    const cpm = safe(spend_brl, impressions) * 1000;
-    const lpv_rate = safe(landing_page_views, link_clicks);
-    const cpa = safe(spend_brl, results);
-
-    const lc = lifecycleMap.get(ad_key);
-
-    // Compute days active from data range
-    const dates = rows.map(r => r.period_start).filter(Boolean).sort();
-    const firstDate = dates[0];
-    const lastDate = dates[dates.length - 1];
-    const daysFromData = firstDate && lastDate
-      ? Math.max(1, Math.ceil((new Date(lastDate).getTime() - new Date(firstDate).getTime()) / 86400000))
-      : 1;
-
-    const days_active = lc?.days_active || daysFromData;
-    const peak_ctr = lc?.peak_ctr || ctr_link;
-    const current_ctr = lc?.current_ctr || ctr_link;
-    const degradation_pct = lc?.degradation_pct || (peak_ctr > 0 ? Math.max(0, ((peak_ctr - current_ctr) / peak_ctr) * 100) : 0);
-    const status = (lc?.status as CreativeStatus) || computeStatus(days_active, degradation_pct, current_ctr, peak_ctr);
+  return creatives.map(c => {
+    const metrics = (metricsByAd.get(c.ad_id) || []).sort((a, b) => a.date.localeCompare(b.date));
+    const daysActive = metrics.length;
+    const totalSpend = metrics.reduce((s, m) => s + Number(m.spend), 0);
+    const totalLeads = metrics.reduce((s, m) => s + Number(m.leads), 0);
+    const avgCtr = daysActive > 0 ? metrics.reduce((s, m) => s + Number(m.ctr), 0) / daysActive : 0;
+    const avgCpl = totalLeads > 0 ? totalSpend / totalLeads : 0;
+    const avgFrequency = daysActive > 0 ? metrics.reduce((s, m) => s + Number(m.frequency), 0) / daysActive : 0;
+    
+    const first3 = metrics.slice(0, 3);
+    const last3 = metrics.slice(-3);
+    const ctrFirst3 = first3.length > 0 ? first3.reduce((s, m) => s + Number(m.ctr), 0) / first3.length : 0;
+    const ctrLast3 = last3.length > 0 ? last3.reduce((s, m) => s + Number(m.ctr), 0) / last3.length : 0;
+    const peakCtr = metrics.length > 0 ? Math.max(...metrics.map(m => Number(m.ctr))) : 0;
+    const degradation = peakCtr > 0 ? Math.max(0, ((peakCtr - ctrLast3) / peakCtr) * 100) : 0;
 
     return {
-      ad_key,
-      ad_name: rows[0].ad_name,
-      campaign_key: rows[0].campaign_key,
-      campaign_name: rows[0].campaign_name,
-      spend_brl, impressions, link_clicks, landing_page_views, results,
-      ctr_link, cpm, lpv_rate, cpa,
-      days_active, peak_ctr, current_ctr, degradation_pct, status,
-      format: lc?.format || null,
-      hook_type: lc?.hook_type || null,
-      lifecycle_id: lc?.id || null,
+      ...c,
+      daily_metrics: metrics,
+      days_active: daysActive,
+      total_spend: totalSpend,
+      total_leads: totalLeads,
+      avg_ctr: avgCtr,
+      avg_cpl: avgCpl,
+      avg_frequency: avgFrequency,
+      ctr_first3: ctrFirst3,
+      ctr_last3: ctrLast3,
+      degradation_pct: degradation,
+      peak_ctr: peakCtr,
     };
   });
 }
 
-function StatusBadge({ status }: { status: CreativeStatus }) {
-  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.fresh;
-  return <Badge variant="outline" className={`text-[10px] font-mono border ${cfg.bgClass}`}>{cfg.label}</Badge>;
-}
+// ─── Analysis Modal ────────────────────────────────────────
+function AnalysisModal({ creative, open, onClose, accountAvgs }: {
+  creative: EnrichedCreative | null;
+  open: boolean;
+  onClose: () => void;
+  accountAvgs: { ctr: number; cpl: number; freq: number };
+}) {
+  const [analysis, setAnalysis] = useState('');
+  const [loading, setLoading] = useState(false);
 
-function LifecycleProgress({ daysActive, format }: { daysActive: number; format: string | null }) {
-  const lifespan = CREATIVE_LIFESPAN[format || 'default'] || CREATIVE_LIFESPAN.default;
-  const progress = Math.min((daysActive / lifespan) * 100, 100);
+  useEffect(() => {
+    if (!open || !creative) return;
+    setAnalysis('');
+    setLoading(true);
+
+    const run = async () => {
+      try {
+        const resp = await supabase.functions.invoke('analyze-creative', {
+          body: {
+            mode: 'individual',
+            creativeData: {
+              ad_name: creative.ad_name,
+              angle: creative.angle,
+              hook: creative.hook,
+              cta: creative.cta,
+              creative_type: creative.creative_type,
+              days_active: creative.days_active,
+              lifecycle_stage: creative.lifecycle_stage,
+              daily_metrics: creative.daily_metrics.slice(-14),
+              account_avg_ctr: accountAvgs.ctr,
+              account_avg_cpl: accountAvgs.cpl,
+              account_avg_freq: accountAvgs.freq,
+              cpl_meta: accountAvgs.cpl,
+            },
+          },
+        });
+
+        if (resp.error) throw resp.error;
+
+        // Parse SSE stream from response
+        const text = typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data);
+        
+        // Handle Anthropic SSE format
+        const lines = text.split('\n');
+        let fullText = '';
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(jsonStr);
+              if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                fullText += parsed.delta.text;
+              }
+            } catch { /* skip */ }
+          }
+        }
+        
+        if (fullText) {
+          setAnalysis(fullText);
+        } else if (resp.data?.content?.[0]?.text) {
+          setAnalysis(resp.data.content[0].text);
+        } else {
+          setAnalysis(text);
+        }
+      } catch (e: any) {
+        console.error(e);
+        setAnalysis(`Erro ao analisar: ${e.message || 'Erro desconhecido'}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    run();
+  }, [open, creative]);
+
+  if (!creative) return null;
+
   return (
-    <div className="space-y-0.5">
-      <Progress value={progress} className="h-1.5" />
-      <p className="text-[9px] text-muted-foreground">~{lifespan}d vida útil estimada</p>
-    </div>
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="glass-panel max-w-2xl max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle className="text-sm flex items-center gap-2">
+            <Bot className="h-4 w-4 text-primary" />
+            Análise IA — {creative.ad_name}
+          </DialogTitle>
+        </DialogHeader>
+        <ScrollArea className="max-h-[60vh]">
+          {loading ? (
+            <div className="flex items-center gap-2 py-8 justify-center">
+              <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+              <span className="text-sm text-muted-foreground">Analisando criativo...</span>
+            </div>
+          ) : (
+            <div className="prose prose-sm prose-invert max-w-none">
+              <ReactMarkdown>{analysis}</ReactMarkdown>
+            </div>
+          )}
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-function EditMetadataDialog({
-  ad: adData,
-  open,
-  onClose,
-  workspaceId,
-  onSaved,
-}: {
-  ad: AdAggregate;
+// ─── Portfolio Analysis Modal ──────────────────────────────
+function PortfolioAnalysisModal({ open, onClose, creatives, accountAvgs }: {
   open: boolean;
   onClose: () => void;
-  workspaceId: string;
+  creatives: EnrichedCreative[];
+  accountAvgs: { ctr: number; cpl: number; freq: number };
+}) {
+  const [analysis, setAnalysis] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || !creatives.length) return;
+    setAnalysis('');
+    setLoading(true);
+
+    const run = async () => {
+      try {
+        const byCounts = { fresh: 0, peaking: 0, declining: 0, fatigued: 0 };
+        creatives.forEach(c => { byCounts[c.lifecycle_stage as keyof typeof byCounts] = (byCounts[c.lifecycle_stage as keyof typeof byCounts] || 0) + 1; });
+
+        const angleGroups: Record<string, { count: number; avg_ctr: number; avg_cpl: number; peaking: number }> = {};
+        creatives.forEach(c => {
+          const a = c.angle || 'não definido';
+          if (!angleGroups[a]) angleGroups[a] = { count: 0, avg_ctr: 0, avg_cpl: 0, peaking: 0 };
+          angleGroups[a].count++;
+          angleGroups[a].avg_ctr += c.avg_ctr;
+          angleGroups[a].avg_cpl += c.avg_cpl;
+          if (c.lifecycle_stage === 'peaking') angleGroups[a].peaking++;
+        });
+        Object.values(angleGroups).forEach(g => {
+          g.avg_ctr = g.count > 0 ? g.avg_ctr / g.count : 0;
+          g.avg_cpl = g.count > 0 ? g.avg_cpl / g.count : 0;
+        });
+
+        const sorted = [...creatives].sort((a, b) => b.avg_ctr - a.avg_ctr);
+        const top3 = sorted.slice(0, 3).map(c => ({ name: c.ad_name, ctr: c.avg_ctr, cpl: c.avg_cpl, stage: c.lifecycle_stage }));
+        const worst3 = sorted.slice(-3).reverse().map(c => ({ name: c.ad_name, ctr: c.avg_ctr, cpl: c.avg_cpl, stage: c.lifecycle_stage }));
+
+        const resp = await supabase.functions.invoke('analyze-creative', {
+          body: {
+            mode: 'portfolio',
+            portfolioData: {
+              total: creatives.length,
+              ...byCounts,
+              peaking_count: byCounts.peaking,
+              declining_count: byCounts.declining,
+              fatigued_count: byCounts.fatigued,
+              fresh_count: byCounts.fresh,
+              angles: angleGroups,
+              top_creatives: top3,
+              worst_creatives: worst3,
+              avg_ctr: accountAvgs.ctr,
+              avg_cpl: accountAvgs.cpl,
+              avg_freq: accountAvgs.freq,
+              paused_count: creatives.filter(c => c.status === 'paused').length,
+            },
+          },
+        });
+
+        if (resp.error) throw resp.error;
+
+        const text = typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data);
+        const lines = text.split('\n');
+        let fullText = '';
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(jsonStr);
+              if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                fullText += parsed.delta.text;
+              }
+            } catch { /* skip */ }
+          }
+        }
+        setAnalysis(fullText || (resp.data?.content?.[0]?.text) || text);
+      } catch (e: any) {
+        console.error(e);
+        setAnalysis(`Erro: ${e.message || 'Erro desconhecido'}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    run();
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
+      <DialogContent className="glass-panel max-w-2xl max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle className="text-sm flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Análise do Portfólio de Criativos
+          </DialogTitle>
+        </DialogHeader>
+        <ScrollArea className="max-h-[60vh]">
+          {loading ? (
+            <div className="flex items-center gap-2 py-8 justify-center">
+              <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+              <span className="text-sm text-muted-foreground">Analisando portfólio...</span>
+            </div>
+          ) : (
+            <div className="prose prose-sm prose-invert max-w-none">
+              <ReactMarkdown>{analysis}</ReactMarkdown>
+            </div>
+          )}
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Edit Creative Dialog ──────────────────────────────────
+function EditCreativeDialog({ creative, open, onClose, onSaved }: {
+  creative: EnrichedCreative;
+  open: boolean;
+  onClose: () => void;
   onSaved: () => void;
 }) {
-  const [format, setFormat] = useState(adData.format || '');
-  const [hookType, setHookType] = useState(adData.hook_type || '');
+  const [creativeType, setCreativeType] = useState(creative.creative_type || '');
+  const [angle, setAngle] = useState(creative.angle || '');
+  const [hook, setHook] = useState(creative.hook || '');
+  const [cta, setCta] = useState(creative.cta || '');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const row = {
-        workspace_id: workspaceId,
-        ad_key: adData.ad_key,
-        ad_name: adData.ad_name,
-        campaign_key: adData.campaign_key,
-        adset_key: null,
-        format: format || null,
-        hook_type: hookType || null,
-        days_active: adData.days_active,
-        peak_ctr: adData.peak_ctr,
-        current_ctr: adData.current_ctr,
-        degradation_pct: adData.degradation_pct,
-        status: adData.status,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (adData.lifecycle_id) {
-        await supabase.from('creative_lifecycle').update(row as any).eq('id', adData.lifecycle_id);
-      } else {
-        await supabase.from('creative_lifecycle').insert(row as any);
-      }
-
-      toast.success('Metadata salva');
+      await supabase.from('ad_creatives').update({
+        creative_type: creativeType || null,
+        angle: angle || null,
+        hook: hook || null,
+        cta: cta || null,
+      } as any).eq('id', creative.id);
+      toast.success('Criativo atualizado');
       onSaved();
       onClose();
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (e: any) {
+      toast.error(e.message);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="glass-panel max-w-sm">
         <DialogHeader>
-          <DialogTitle className="text-sm">Editar Metadata</DialogTitle>
+          <DialogTitle className="text-sm">Editar Criativo</DialogTitle>
         </DialogHeader>
-        <p className="text-xs text-muted-foreground truncate">{adData.ad_name}</p>
+        <p className="text-xs text-muted-foreground truncate">{creative.ad_name}</p>
         <div className="space-y-3 py-2">
           <div className="space-y-1">
-            <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Formato</label>
-            <Select value={format} onValueChange={setFormat}>
+            <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Tipo</label>
+            <Select value={creativeType} onValueChange={setCreativeType}>
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar..." /></SelectTrigger>
               <SelectContent>
-                {FORMAT_OPTIONS.map(f => <SelectItem key={f} value={f} className="text-xs">{f}</SelectItem>)}
+                {['video', 'image', 'carousel'].map(f => <SelectItem key={f} value={f} className="text-xs">{f}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Tipo de Hook</label>
-            <Select value={hookType} onValueChange={setHookType}>
+            <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Ângulo</label>
+            <Select value={angle} onValueChange={setAngle}>
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar..." /></SelectTrigger>
               <SelectContent>
-                {HOOK_OPTIONS.map(h => <SelectItem key={h} value={h} className="text-xs">{h}</SelectItem>)}
+                {Object.entries(ANGLE_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-xs">{v}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Hook (0-3s)</label>
+            <input className="w-full h-8 text-xs rounded-md border border-border bg-background px-2" value={hook} onChange={e => setHook(e.target.value)} placeholder="Descreva o hook..." />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] text-muted-foreground uppercase tracking-wider">CTA</label>
+            <input className="w-full h-8 text-xs rounded-md border border-border bg-background px-2" value={cta} onChange={e => setCta(e.target.value)} placeholder="Ex: Agende diagnóstico" />
           </div>
           <Button onClick={handleSave} disabled={saving} size="sm" className="w-full text-xs gap-1">
             <Check className="h-3 w-3" /> {saving ? 'Salvando...' : 'Salvar'}
@@ -214,107 +435,396 @@ function EditMetadataDialog({
   );
 }
 
-const LIFESPAN_CHART_DATA = [
-  { format: 'Vídeo', days: 14, fill: 'hsl(var(--chart-1))' },
-  { format: 'Imagem', days: 21, fill: 'hsl(var(--chart-2))' },
-  { format: 'Carrossel', days: 28, fill: 'hsl(var(--chart-3))' },
-  { format: 'Stories', days: 10, fill: 'hsl(var(--chart-4))' },
-];
+// ─── Summary Cards ─────────────────────────────────────────
+function SummaryCards({ creatives, accountAvgCtr, avgDegradation }: {
+  creatives: EnrichedCreative[];
+  accountAvgCtr: number;
+  avgDegradation: number;
+}) {
+  const active = creatives.filter(c => c.status === 'active');
+  const peaking = active.filter(c => c.lifecycle_stage === 'peaking').length;
+  const fatigued = active.filter(c => c.lifecycle_stage === 'fatigued').length;
 
-type SortKey = 'ad_name' | 'ctr_link' | 'cpm' | 'lpv_rate' | 'cpa' | 'days_active' | 'status' | 'degradation_pct';
+  const cards = [
+    { label: 'Criativos Ativos', value: active.length, icon: Layers, color: 'text-foreground' },
+    { label: 'Em Peaking', value: peaking, icon: TrendingUp, color: 'text-emerald-400' },
+    { label: 'Fatigued', value: fatigued, icon: TrendingDown, color: 'text-red-400' },
+    { label: 'CTR Médio', value: `${accountAvgCtr.toFixed(2)}%`, icon: Eye, color: 'text-primary' },
+    { label: 'Degradação Média', value: `${avgDegradation.toFixed(0)}%`, icon: TrendingDown, color: avgDegradation > 25 ? 'text-red-400' : 'text-amber-400' },
+  ];
 
-export default function CreativesView() {
-  const { state } = useAppState();
-  const { current } = useFilteredRecords();
-  const { workspace } = useWorkspace();
-  const [statusFilter, setStatusFilter] = useState<'all' | CreativeStatus>('all');
-  const [editingAd, setEditingAd] = useState<AdAggregate | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>('degradation_pct');
-  const [sortAsc, setSortAsc] = useState(false);
-  const [lifecycleVersion, setLifecycleVersion] = useState(0);
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      {cards.map((c, i) => (
+        <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+          <Card className="glass-panel">
+            <CardContent className="p-3 flex flex-col items-center text-center gap-1">
+              <c.icon className={`h-4 w-4 ${c.color}`} />
+              <p className={`text-lg font-bold font-mono ${c.color}`}>{c.value}</p>
+              <p className="text-[10px] text-muted-foreground">{c.label}</p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
 
-  // Load lifecycle data from state (we'll use supabase directly for now)
-  const [lifecycleData, setLifecycleData] = useState<CreativeLifecycleRecord[]>([]);
-  
-  // Load lifecycle on mount
-  useState(() => {
-    if (!workspace) return;
-    supabase.from('creative_lifecycle').select('*').eq('workspace_id', workspace.id)
-      .then(({ data }) => {
-        if (data) setLifecycleData(data.map((r: any) => ({
-          id: r.id,
-          workspace_id: r.workspace_id,
-          ad_key: r.ad_key,
-          ad_name: r.ad_name,
-          campaign_key: r.campaign_key,
-          adset_key: r.adset_key,
-          format: r.format,
-          hook_type: r.hook_type,
-          activated_at: r.activated_at,
-          days_active: Number(r.days_active || 0),
-          peak_ctr: Number(r.peak_ctr || 0),
-          peak_ctr_date: r.peak_ctr_date,
-          current_ctr: Number(r.current_ctr || 0),
-          degradation_pct: Number(r.degradation_pct || 0),
-          status: r.status || 'active',
-        })));
-      });
-  });
+// ─── Creative Card (Grid) ──────────────────────────────────
+function CreativeCard({ creative, onAnalyze, onEdit }: {
+  creative: EnrichedCreative;
+  onAnalyze: () => void;
+  onEdit: () => void;
+}) {
+  const cfg = STAGE_CONFIG[creative.lifecycle_stage] || STAGE_CONFIG.fresh;
+  const degradColor = creative.degradation_pct > 30 ? 'text-red-400' : creative.degradation_pct > 15 ? 'text-amber-400' : 'text-emerald-400';
+  const TypeIcon = TYPE_ICONS[creative.creative_type || ''] || Image;
 
-  const lifecycleMap = useMemo(() => {
-    const map = new Map<string, CreativeLifecycleRecord>();
-    for (const lc of lifecycleData) map.set(lc.ad_key, lc);
-    return map;
-  }, [lifecycleData, lifecycleVersion]);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`glass-panel p-3 space-y-2 ${creative.lifecycle_stage === 'fatigued' ? 'border-red-500/30' : creative.lifecycle_stage === 'declining' ? 'border-amber-500/20' : ''}`}
+    >
+      {/* Thumbnail */}
+      {creative.thumbnail_url ? (
+        <div className="h-28 rounded-md overflow-hidden bg-muted">
+          <img src={creative.thumbnail_url} alt={creative.ad_name} className="w-full h-full object-cover" />
+        </div>
+      ) : (
+        <div className="h-28 rounded-md bg-muted/30 flex items-center justify-center">
+          <TypeIcon className="h-8 w-8 text-muted-foreground/30" />
+        </div>
+      )}
 
-  const records = current.length > 0 ? current : state.records;
-  const allAds = useMemo(() => aggregateAds(records, lifecycleMap), [records, lifecycleMap]);
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium text-foreground truncate" title={creative.ad_name}>{creative.ad_name}</p>
+          <p className="text-[10px] text-muted-foreground truncate">{creative.campaign_id || '—'}</p>
+        </div>
+        <StageBadge stage={creative.lifecycle_stage} />
+      </div>
 
-  const filteredAds = useMemo(() => {
-    let ads = statusFilter === 'all' ? allAds : allAds.filter(a => a.status === statusFilter);
-    ads.sort((a, b) => {
-      const av = a[sortKey] ?? 0;
-      const bv = b[sortKey] ?? 0;
-      if (typeof av === 'string' && typeof bv === 'string') return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
-      return sortAsc ? (av as number) - (bv as number) : (bv as number) - (av as number);
+      {/* Metrics */}
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div>
+          <p className="text-[9px] text-muted-foreground">CTR</p>
+          <p className="text-xs font-mono font-bold">{creative.avg_ctr.toFixed(2)}%</p>
+        </div>
+        <div>
+          <p className="text-[9px] text-muted-foreground">CPL</p>
+          <p className="text-xs font-mono font-bold">{creative.avg_cpl > 0 ? brl(creative.avg_cpl) : '—'}</p>
+        </div>
+        <div>
+          <p className="text-[9px] text-muted-foreground">Freq.</p>
+          <p className="text-xs font-mono font-bold">{creative.avg_frequency.toFixed(1)}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between text-[10px]">
+        <span className="text-muted-foreground">{creative.days_active}d no ar • {brl(creative.total_spend)}</span>
+        <span className={`font-mono font-bold ${degradColor}`}>
+          {creative.degradation_pct > 0 ? '↓' : '→'} {creative.degradation_pct.toFixed(0)}%
+        </span>
+      </div>
+
+      {/* Tags */}
+      <div className="flex gap-1 flex-wrap">
+        {creative.creative_type && <Badge variant="secondary" className="text-[9px] h-4">{creative.creative_type}</Badge>}
+        {creative.angle && <Badge variant="secondary" className="text-[9px] h-4">{ANGLE_LABELS[creative.angle] || creative.angle}</Badge>}
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-1.5">
+        <Button variant="outline" size="sm" className="flex-1 text-[10px] h-7 gap-1" onClick={onAnalyze}>
+          <Bot className="h-3 w-3" /> Análise IA
+        </Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}>
+          <Edit2 className="h-3 w-3" />
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Tab: Degradation Charts ───────────────────────────────
+function DegradationTab({ creatives }: { creatives: EnrichedCreative[] }) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const creative = creatives.find(c => c.ad_id === selected) || creatives[0];
+
+  if (!creative || !creative.daily_metrics.length) {
+    return <p className="text-sm text-muted-foreground text-center py-8">Sem dados de métricas diárias para análise de degradação.</p>;
+  }
+
+  const chartData = creative.daily_metrics.map(m => ({
+    date: m.date.slice(5),
+    ctr: Number(m.ctr),
+    frequency: Number(m.frequency),
+  }));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Select value={selected || creative.ad_id} onValueChange={setSelected}>
+          <SelectTrigger className="h-8 text-xs max-w-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {creatives.filter(c => c.daily_metrics.length > 0).map(c => (
+              <SelectItem key={c.ad_id} value={c.ad_id} className="text-xs">{c.ad_name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <StageBadge stage={creative.lifecycle_stage} />
+        <span className="text-xs text-muted-foreground">Degradação: <span className={`font-bold ${creative.degradation_pct > 30 ? 'text-red-400' : 'text-amber-400'}`}>{creative.degradation_pct.toFixed(1)}%</span></span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* CTR Chart */}
+        <div className="glass-panel p-4 space-y-2">
+          <h4 className="text-xs font-semibold">CTR dia a dia</h4>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+                <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} />
+                <YAxis tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={v => `${v}%`} />
+                <Tooltip contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 11 }} formatter={(v: number) => [`${v.toFixed(2)}%`, 'CTR']} />
+                <ReferenceLine y={creative.ctr_first3} stroke="hsl(var(--primary))" strokeDasharray="5 5" label={{ value: `Ref: ${creative.ctr_first3.toFixed(2)}%`, fontSize: 9, fill: 'hsl(var(--primary))' }} />
+                {creative.avg_ctr < 1.0 && <ReferenceLine y={1.0} stroke="hsl(var(--destructive))" strokeDasharray="3 3" label={{ value: 'Crítico 1%', fontSize: 9, fill: 'hsl(var(--destructive))' }} />}
+                <Area type="monotone" dataKey="ctr" stroke="hsl(var(--chart-1))" fill="hsl(var(--chart-1))" fillOpacity={0.15} strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Frequency Chart */}
+        <div className="glass-panel p-4 space-y-2">
+          <h4 className="text-xs font-semibold">Frequência ao longo do tempo</h4>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+                <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} />
+                <YAxis tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} />
+                <Tooltip contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 11 }} formatter={(v: number) => [v.toFixed(2), 'Freq.']} />
+                <ReferenceLine y={2.5} stroke="hsl(var(--warning))" strokeDasharray="5 5" label={{ value: '2.5', fontSize: 9, fill: 'hsl(var(--warning))' }} />
+                <ReferenceLine y={3.5} stroke="hsl(var(--destructive))" strokeDasharray="5 5" label={{ value: '3.5', fontSize: 9, fill: 'hsl(var(--destructive))' }} />
+                <Area type="monotone" dataKey="frequency" stroke="hsl(var(--chart-3))" fill="hsl(var(--chart-3))" fillOpacity={0.15} strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab: Angle Library ────────────────────────────────────
+function AngleLibraryTab({ creatives }: { creatives: EnrichedCreative[] }) {
+  const angleStats = useMemo(() => {
+    const groups: Record<string, { count: number; avg_ctr: number; avg_cpl: number; peaking: number; total: number }> = {};
+    
+    creatives.forEach(c => {
+      const a = c.angle || 'não definido';
+      if (!groups[a]) groups[a] = { count: 0, avg_ctr: 0, avg_cpl: 0, peaking: 0, total: 0 };
+      groups[a].count++;
+      groups[a].avg_ctr += c.avg_ctr;
+      groups[a].avg_cpl += c.avg_cpl;
+      groups[a].total++;
+      if (c.lifecycle_stage === 'peaking') groups[a].peaking++;
     });
-    return ads;
-  }, [allAds, statusFilter, sortKey, sortAsc]);
 
-  const fatiguedCount = allAds.filter(a => a.status === 'fatigued' || a.degradation_pct > 25).length;
+    return Object.entries(groups).map(([angle, stats]) => ({
+      angle,
+      label: ANGLE_LABELS[angle] || angle,
+      count: stats.count,
+      avg_ctr: stats.count > 0 ? stats.avg_ctr / stats.count : 0,
+      avg_cpl: stats.count > 0 ? stats.avg_cpl / stats.count : 0,
+      success_rate: stats.total > 0 ? (stats.peaking / stats.total) * 100 : 0,
+    })).sort((a, b) => b.avg_ctr - a.avg_ctr);
+  }, [creatives]);
 
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) setSortAsc(!sortAsc);
-    else { setSortKey(key); setSortAsc(false); }
-  };
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {angleStats.map((a, i) => (
+          <motion.div key={a.angle} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+            <Card className="glass-panel">
+              <CardHeader className="p-3 pb-1">
+                <CardTitle className="text-sm flex items-center justify-between">
+                  {a.label}
+                  <Badge variant="secondary" className="text-[10px]">{a.count} criativos</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-1 space-y-2">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-[9px] text-muted-foreground">CTR Médio</p>
+                    <p className="text-sm font-mono font-bold">{a.avg_ctr.toFixed(2)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-muted-foreground">CPL Médio</p>
+                    <p className="text-sm font-mono font-bold">{a.avg_cpl > 0 ? brl(a.avg_cpl) : '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-muted-foreground">% Sucesso</p>
+                    <p className={`text-sm font-mono font-bold ${a.success_rate > 50 ? 'text-emerald-400' : a.success_rate > 20 ? 'text-amber-400' : 'text-red-400'}`}>
+                      {a.success_rate.toFixed(0)}%
+                    </p>
+                  </div>
+                </div>
+                <Progress value={a.success_rate} className="h-1.5" />
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
+      </div>
+      {angleStats.length === 0 && (
+        <p className="text-sm text-muted-foreground text-center py-8">
+          Defina ângulos nos criativos para ver a biblioteca de performance.
+        </p>
+      )}
+    </div>
+  );
+}
 
-  const reloadLifecycle = () => {
+// ─── Tab: Timeline ─────────────────────────────────────────
+function TimelineTab({ creatives }: { creatives: EnrichedCreative[] }) {
+  const sorted = useMemo(() => 
+    [...creatives]
+      .filter(c => c.first_seen_at)
+      .sort((a, b) => (b.first_seen_at || '').localeCompare(a.first_seen_at || '')),
+    [creatives]
+  );
+
+  // Check gap
+  const dates = sorted.map(c => c.first_seen_at!).sort();
+  const lastLaunch = dates.length > 0 ? dates[dates.length - 1] : null;
+  const daysSinceLastLaunch = lastLaunch ? Math.ceil((Date.now() - new Date(lastLaunch).getTime()) / 86400000) : 0;
+
+  return (
+    <div className="space-y-4">
+      {daysSinceLastLaunch > 7 && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-panel p-3 border-amber-500/30 flex items-center gap-3">
+          <AlertTriangle className="h-4 w-4 text-amber-400 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-medium text-amber-400">📅 {daysSinceLastLaunch} dias sem novo criativo</p>
+            <p className="text-[10px] text-muted-foreground">Risco de fadiga geral. Lance 2-3 novas peças esta semana.</p>
+          </div>
+        </motion.div>
+      )}
+
+      <div className="space-y-2">
+        {sorted.map((c, i) => (
+          <motion.div key={c.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }} className="glass-panel p-3 flex items-center gap-3">
+            <div className="flex-shrink-0 w-16 text-center">
+              <p className="text-[10px] text-muted-foreground">{c.first_seen_at?.slice(5)}</p>
+              <p className="text-[9px] text-muted-foreground/60">{c.days_active}d</p>
+            </div>
+            <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
+              c.lifecycle_stage === 'fatigued' ? 'bg-red-500' :
+              c.lifecycle_stage === 'declining' ? 'bg-amber-500' :
+              c.lifecycle_stage === 'peaking' ? 'bg-emerald-500' : 'bg-blue-500'
+            }`} />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium truncate">{c.ad_name}</p>
+              <div className="flex items-center gap-2">
+                <StageBadge stage={c.lifecycle_stage} />
+                {c.status === 'paused' && <Badge variant="outline" className="text-[9px] border-muted-foreground/30">Pausado</Badge>}
+              </div>
+            </div>
+            <div className="text-right text-[10px] text-muted-foreground">
+              <p>CTR {c.avg_ctr.toFixed(2)}%</p>
+              <p>{brl(c.total_spend)}</p>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {sorted.length === 0 && (
+        <p className="text-sm text-muted-foreground text-center py-8">Nenhum criativo com data de lançamento definida.</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Component ────────────────────────────────────────
+export default function CreativesView() {
+  const { workspace } = useWorkspace();
+  const [creatives, setCreatives] = useState<AdCreative[]>([]);
+  const [metrics, setMetrics] = useState<DailyMetric[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stageFilter, setStageFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [angleFilter, setAngleFilter] = useState<string>('all');
+  const [analyzingCreative, setAnalyzingCreative] = useState<EnrichedCreative | null>(null);
+  const [editingCreative, setEditingCreative] = useState<EnrichedCreative | null>(null);
+  const [portfolioAnalysisOpen, setPortfolioAnalysisOpen] = useState(false);
+
+  const loadData = useCallback(async () => {
     if (!workspace) return;
-    supabase.from('creative_lifecycle').select('*').eq('workspace_id', workspace.id)
-      .then(({ data }) => {
-        if (data) {
-          setLifecycleData(data.map((r: any) => ({
-            id: r.id, workspace_id: r.workspace_id, ad_key: r.ad_key, ad_name: r.ad_name,
-            campaign_key: r.campaign_key, adset_key: r.adset_key, format: r.format,
-            hook_type: r.hook_type, activated_at: r.activated_at,
-            days_active: Number(r.days_active || 0), peak_ctr: Number(r.peak_ctr || 0),
-            peak_ctr_date: r.peak_ctr_date, current_ctr: Number(r.current_ctr || 0),
-            degradation_pct: Number(r.degradation_pct || 0), status: r.status || 'active',
-          })));
-          setLifecycleVersion(v => v + 1);
-        }
-      });
-  };
+    setLoading(true);
+    try {
+      const [creativesRes, metricsRes] = await Promise.all([
+        supabase.from('ad_creatives').select('*').eq('workspace_id', workspace.id),
+        supabase.from('creative_daily_metrics').select('*').eq('workspace_id', workspace.id).order('date', { ascending: true }),
+      ]);
+      setCreatives((creativesRes.data as any[]) || []);
+      setMetrics((metricsRes.data as any[]) || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [workspace]);
 
-  if (allAds.length === 0) {
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const enriched = useMemo(() => enrichCreatives(creatives, metrics), [creatives, metrics]);
+
+  const filtered = useMemo(() => {
+    let list = enriched;
+    if (stageFilter !== 'all') list = list.filter(c => c.lifecycle_stage === stageFilter);
+    if (typeFilter !== 'all') list = list.filter(c => c.creative_type === typeFilter);
+    if (angleFilter !== 'all') list = list.filter(c => c.angle === angleFilter);
+    // Sort: fatigued first, then declining, fresh, peaking
+    const order: Record<string, number> = { fatigued: 0, declining: 1, fresh: 2, peaking: 3 };
+    list.sort((a, b) => (order[a.lifecycle_stage] ?? 4) - (order[b.lifecycle_stage] ?? 4));
+    return list;
+  }, [enriched, stageFilter, typeFilter, angleFilter]);
+
+  const accountAvgs = useMemo(() => {
+    const active = enriched.filter(c => c.status === 'active' && c.days_active > 0);
+    const ctr = active.length > 0 ? active.reduce((s, c) => s + c.avg_ctr, 0) / active.length : 0;
+    const cpl = active.length > 0 ? active.reduce((s, c) => s + c.avg_cpl, 0) / active.length : 0;
+    const freq = active.length > 0 ? active.reduce((s, c) => s + c.avg_frequency, 0) / active.length : 0;
+    return { ctr, cpl, freq };
+  }, [enriched]);
+
+  const avgDegradation = useMemo(() => {
+    const withDeg = enriched.filter(c => c.days_active > 3);
+    return withDeg.length > 0 ? withDeg.reduce((s, c) => s + c.degradation_pct, 0) / withDeg.length : 0;
+  }, [enriched]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[40vh]">
+        <div className="animate-pulse text-muted-foreground text-sm">Carregando criativos...</div>
+      </div>
+    );
+  }
+
+  if (enriched.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center min-h-[60vh]">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-4 max-w-md">
-          <div className="h-20 w-20 mx-auto rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center glow-primary">
+          <div className="h-20 w-20 mx-auto rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
             <Palette className="h-10 w-10 text-primary" />
           </div>
-          <h2 className="text-xl font-bold text-foreground">Análise de Criativos</h2>
-          <p className="text-sm text-muted-foreground">Sincronize dados do Meta Ads para analisar a performance e ciclo de vida dos seus criativos.</p>
+          <h2 className="text-xl font-bold text-foreground">Módulo de Criativos</h2>
+          <p className="text-sm text-muted-foreground">
+            Sincronize dados do Meta Ads e cadastre seus criativos para analisar ciclo de vida, fadiga e degradação de performance.
+          </p>
         </motion.div>
       </div>
     );
@@ -326,177 +836,182 @@ export default function CreativesView() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-foreground">Criativos</h2>
-          <p className="text-xs text-muted-foreground">{allAds.length} anúncios • Performance e ciclo de vida</p>
+          <p className="text-xs text-muted-foreground">{enriched.length} criativos • Ciclo de vida e performance</p>
         </div>
         <div className="flex items-center gap-2">
-          <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-            <SelectTrigger className="h-7 w-32 text-[10px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-xs">Todos</SelectItem>
-              <SelectItem value="fresh" className="text-xs">Fresh</SelectItem>
-              <SelectItem value="peaking" className="text-xs">Peaking</SelectItem>
-              <SelectItem value="declining" className="text-xs">Declining</SelectItem>
-              <SelectItem value="fatigued" className="text-xs">Fatigued</SelectItem>
-            </SelectContent>
-          </Select>
+          <Button variant="outline" size="sm" className="text-[10px] h-7 gap-1" onClick={() => setPortfolioAnalysisOpen(true)}>
+            <Sparkles className="h-3 w-3" /> Analisar portfólio
+          </Button>
         </div>
       </div>
 
       {/* Fatigued Alert */}
-      {fatiguedCount > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-panel p-3 border-destructive/30 flex items-center gap-3"
-        >
-          <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />
+      {enriched.filter(c => c.lifecycle_stage === 'fatigued' && c.status === 'active').length > 0 && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="glass-panel p-3 border-red-500/30 flex items-center gap-3">
+          <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0" />
           <div>
-            <p className="text-xs font-medium text-destructive">
-              {fatiguedCount} criativo{fatiguedCount > 1 ? 's' : ''} com fadiga ou degradação &gt; 25%
+            <p className="text-xs font-medium text-red-400">
+              🔴 {enriched.filter(c => c.lifecycle_stage === 'fatigued' && c.status === 'active').length} criativo(s) fadigado(s) ativo(s)
             </p>
-            <p className="text-[10px] text-muted-foreground">Considere pausar e substituir para manter a performance.</p>
+            <p className="text-[10px] text-muted-foreground">Pausar ou substituir urgentemente para evitar desperdício de budget.</p>
           </div>
         </motion.div>
       )}
 
-      {/* Status Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-        {filteredAds.slice(0, 20).map((ad, i) => (
-          <motion.div
-            key={ad.ad_key}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.02 }}
-            className={`glass-panel p-3 space-y-2 ${
-              ad.status === 'fatigued' ? 'border-destructive/30' : ad.status === 'declining' ? 'border-warning/20' : ''
-            }`}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-foreground truncate" title={ad.ad_name}>{ad.ad_name}</p>
-                <p className="text-[10px] text-muted-foreground truncate">{ad.campaign_name || ad.campaign_key || '—'}</p>
-              </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <StatusBadge status={ad.status} />
-                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setEditingAd(ad)}>
-                  <Edit2 className="h-3 w-3 text-muted-foreground" />
-                </Button>
-              </div>
-            </div>
+      {/* Summary Cards */}
+      <SummaryCards creatives={enriched} accountAvgCtr={accountAvgs.ctr} avgDegradation={avgDegradation} />
 
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div>
-                <p className="text-[9px] text-muted-foreground">CTR Atual</p>
-                <p className="text-xs font-mono font-bold text-foreground">{ad.current_ctr.toFixed(2)}%</p>
-              </div>
-              <div>
-                <p className="text-[9px] text-muted-foreground">Peak CTR</p>
-                <p className="text-xs font-mono text-foreground">{ad.peak_ctr.toFixed(2)}%</p>
-              </div>
-              <div>
-                <p className="text-[9px] text-muted-foreground">Degrad.</p>
-                <p className={`text-xs font-mono font-bold ${ad.degradation_pct > 25 ? 'text-destructive' : ad.degradation_pct > 15 ? 'text-warning' : 'text-positive'}`}>
-                  {ad.degradation_pct.toFixed(0)}%
-                </p>
-              </div>
-            </div>
-
-            <LifecycleProgress daysActive={ad.days_active} format={ad.format} />
-
-            {(ad.format || ad.hook_type) && (
-              <div className="flex gap-1 flex-wrap">
-                {ad.format && <Badge variant="secondary" className="text-[9px] h-4">{ad.format}</Badge>}
-                {ad.hook_type && <Badge variant="secondary" className="text-[9px] h-4">{ad.hook_type}</Badge>}
-              </div>
-            )}
-          </motion.div>
-        ))}
-      </div>
-      {filteredAds.length > 20 && (
-        <p className="text-[10px] text-muted-foreground text-center">Mostrando 20 de {filteredAds.length} criativos nos cards. Veja todos na tabela abaixo.</p>
-      )}
-
-      {/* Performance Table */}
-      <div className="glass-panel overflow-hidden">
-        <div className="p-3 border-b border-border/40">
-          <h3 className="text-sm font-semibold text-foreground">Performance por Anúncio</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-[10px] cursor-pointer hover:text-foreground" onClick={() => handleSort('ad_name')}>Anúncio</TableHead>
-                <TableHead className="text-[10px]">Campanha</TableHead>
-                <TableHead className="text-[10px] text-right cursor-pointer hover:text-foreground" onClick={() => handleSort('ctr_link')}>CTR</TableHead>
-                <TableHead className="text-[10px] text-right cursor-pointer hover:text-foreground" onClick={() => handleSort('cpm')}>CPM</TableHead>
-                <TableHead className="text-[10px] text-right cursor-pointer hover:text-foreground" onClick={() => handleSort('lpv_rate')}>LPV Rate</TableHead>
-                <TableHead className="text-[10px] text-right cursor-pointer hover:text-foreground" onClick={() => handleSort('cpa')}>CPA</TableHead>
-                <TableHead className="text-[10px] text-right cursor-pointer hover:text-foreground" onClick={() => handleSort('days_active')}>Dias</TableHead>
-                <TableHead className="text-[10px] text-right cursor-pointer hover:text-foreground" onClick={() => handleSort('degradation_pct')}>Degrad.</TableHead>
-                <TableHead className="text-[10px] cursor-pointer hover:text-foreground" onClick={() => handleSort('status')}>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAds.map(ad => (
-                <TableRow
-                  key={ad.ad_key}
-                  className={
-                    ad.status === 'fatigued' ? 'bg-destructive/5' :
-                    ad.status === 'declining' ? 'bg-warning/5' : ''
-                  }
-                >
-                  <TableCell className="text-xs font-medium max-w-[180px] truncate" title={ad.ad_name}>{ad.ad_name}</TableCell>
-                  <TableCell className="text-[10px] text-muted-foreground max-w-[140px] truncate">{ad.campaign_name || '—'}</TableCell>
-                  <TableCell className="text-xs font-mono text-right">{ad.ctr_link.toFixed(2)}%</TableCell>
-                  <TableCell className="text-xs font-mono text-right">{brl(ad.cpm)}</TableCell>
-                  <TableCell className="text-xs font-mono text-right">{pct(ad.lpv_rate)}</TableCell>
-                  <TableCell className="text-xs font-mono text-right">{brl(ad.cpa)}</TableCell>
-                  <TableCell className="text-xs font-mono text-right">{ad.days_active}d</TableCell>
-                  <TableCell className={`text-xs font-mono text-right ${ad.degradation_pct > 25 ? 'text-destructive font-bold' : ad.degradation_pct > 15 ? 'text-warning' : ''}`}>
-                    {ad.degradation_pct.toFixed(0)}%
-                  </TableCell>
-                  <TableCell><StatusBadge status={ad.status} /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+      {/* Filters */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+        <Select value={stageFilter} onValueChange={setStageFilter}>
+          <SelectTrigger className="h-7 w-32 text-[10px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" className="text-xs">Todos estágios</SelectItem>
+            <SelectItem value="fresh" className="text-xs">🆕 Fresh</SelectItem>
+            <SelectItem value="peaking" className="text-xs">🚀 Peaking</SelectItem>
+            <SelectItem value="declining" className="text-xs">⚠️ Declining</SelectItem>
+            <SelectItem value="fatigued" className="text-xs">🔴 Fatigued</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="h-7 w-28 text-[10px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" className="text-xs">Todos tipos</SelectItem>
+            <SelectItem value="video" className="text-xs">Vídeo</SelectItem>
+            <SelectItem value="image" className="text-xs">Imagem</SelectItem>
+            <SelectItem value="carousel" className="text-xs">Carrossel</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={angleFilter} onValueChange={setAngleFilter}>
+          <SelectTrigger className="h-7 w-32 text-[10px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" className="text-xs">Todos ângulos</SelectItem>
+            {Object.entries(ANGLE_LABELS).map(([k, v]) => <SelectItem key={k} value={k} className="text-xs">{v}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Lifespan Chart */}
-      <div className="glass-panel p-4 space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">Vida Útil Média por Formato</h3>
-          <p className="text-[10px] text-muted-foreground">Médias iniciais — serão calibradas com seu histórico</p>
-        </div>
-        <div className="h-40">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={LIFESPAN_CHART_DATA} layout="vertical" margin={{ left: 60, right: 20 }}>
-              <XAxis type="number" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-              <YAxis type="category" dataKey="format" tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }} axisLine={false} tickLine={false} width={55} />
-              <Tooltip
-                contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 11 }}
-                formatter={(value: number) => [`${value} dias`, 'Vida útil']}
+      {/* Tabs */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList className="bg-muted/30 p-0.5">
+          <TabsTrigger value="overview" className="text-xs gap-1"><Layers className="h-3 w-3" /> Visão Geral</TabsTrigger>
+          <TabsTrigger value="ranking" className="text-xs gap-1"><BarChart2 className="h-3 w-3" /> Ranking</TabsTrigger>
+          <TabsTrigger value="degradation" className="text-xs gap-1"><TrendingDown className="h-3 w-3" /> Degradação</TabsTrigger>
+          <TabsTrigger value="angles" className="text-xs gap-1"><Palette className="h-3 w-3" /> Ângulos</TabsTrigger>
+          <TabsTrigger value="timeline" className="text-xs gap-1"><Clock className="h-3 w-3" /> Linha do Tempo</TabsTrigger>
+        </TabsList>
+
+        {/* Tab 1: Overview Grid */}
+        <TabsContent value="overview">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {filtered.slice(0, 24).map(c => (
+              <CreativeCard
+                key={c.id}
+                creative={c}
+                onAnalyze={() => setAnalyzingCreative(c)}
+                onEdit={() => setEditingCreative(c)}
               />
-              <Bar dataKey="days" radius={[0, 4, 4, 0]} barSize={20}>
-                {LIFESPAN_CHART_DATA.map((entry, i) => (
-                  <Cell key={i} fill={entry.fill} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+            ))}
+          </div>
+          {filtered.length > 24 && (
+            <p className="text-[10px] text-muted-foreground text-center mt-3">Mostrando 24 de {filtered.length}. Veja todos no Ranking.</p>
+          )}
+        </TabsContent>
+
+        {/* Tab 2: Ranking Table */}
+        <TabsContent value="ranking">
+          <div className="glass-panel overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-[10px]">Criativo</TableHead>
+                    <TableHead className="text-[10px]">Estágio</TableHead>
+                    <TableHead className="text-[10px] text-right">Dias</TableHead>
+                    <TableHead className="text-[10px] text-right">CTR</TableHead>
+                    <TableHead className="text-[10px] text-right">Δ CTR</TableHead>
+                    <TableHead className="text-[10px] text-right">CPL</TableHead>
+                    <TableHead className="text-[10px] text-right">Freq.</TableHead>
+                    <TableHead className="text-[10px] text-right">Spend</TableHead>
+                    <TableHead className="text-[10px] text-right">Leads</TableHead>
+                    <TableHead className="text-[10px]">Ação Sugerida</TableHead>
+                    <TableHead className="text-[10px]">IA</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map(c => {
+                    const cfg = STAGE_CONFIG[c.lifecycle_stage] || STAGE_CONFIG.fresh;
+                    const degradColor = c.degradation_pct > 30 ? 'text-red-400' : c.degradation_pct > 15 ? 'text-amber-400' : 'text-emerald-400';
+                    return (
+                      <TableRow key={c.id} className={c.lifecycle_stage === 'fatigued' ? 'bg-red-500/5' : c.lifecycle_stage === 'declining' ? 'bg-amber-500/5' : ''}>
+                        <TableCell className="text-xs font-medium max-w-[180px] truncate" title={c.ad_name}>{c.ad_name}</TableCell>
+                        <TableCell><StageBadge stage={c.lifecycle_stage} /></TableCell>
+                        <TableCell className="text-xs font-mono text-right">{c.days_active}d</TableCell>
+                        <TableCell className="text-xs font-mono text-right">{c.avg_ctr.toFixed(2)}%</TableCell>
+                        <TableCell className={`text-xs font-mono text-right font-bold ${degradColor}`}>
+                          {c.degradation_pct > 0 ? '-' : ''}{c.degradation_pct.toFixed(0)}%
+                        </TableCell>
+                        <TableCell className="text-xs font-mono text-right">{c.avg_cpl > 0 ? brl(c.avg_cpl) : '—'}</TableCell>
+                        <TableCell className={`text-xs font-mono text-right ${c.avg_frequency > 3.5 ? 'text-red-400 font-bold' : c.avg_frequency > 2.5 ? 'text-amber-400' : ''}`}>
+                          {c.avg_frequency.toFixed(1)}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono text-right">{brl(c.total_spend)}</TableCell>
+                        <TableCell className="text-xs font-mono text-right">{c.total_leads}</TableCell>
+                        <TableCell className="text-[10px]">{cfg.action}</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setAnalyzingCreative(c)}>
+                            <Bot className="h-3 w-3 text-primary" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Tab 3: Degradation */}
+        <TabsContent value="degradation">
+          <DegradationTab creatives={enriched.filter(c => c.daily_metrics.length > 0)} />
+        </TabsContent>
+
+        {/* Tab 4: Angles */}
+        <TabsContent value="angles">
+          <AngleLibraryTab creatives={enriched} />
+        </TabsContent>
+
+        {/* Tab 5: Timeline */}
+        <TabsContent value="timeline">
+          <TimelineTab creatives={enriched} />
+        </TabsContent>
+      </Tabs>
+
+      {/* Analysis Modal */}
+      <AnalysisModal
+        creative={analyzingCreative}
+        open={!!analyzingCreative}
+        onClose={() => setAnalyzingCreative(null)}
+        accountAvgs={accountAvgs}
+      />
+
+      {/* Portfolio Analysis Modal */}
+      <PortfolioAnalysisModal
+        open={portfolioAnalysisOpen}
+        onClose={() => setPortfolioAnalysisOpen(false)}
+        creatives={enriched}
+        accountAvgs={accountAvgs}
+      />
 
       {/* Edit Dialog */}
-      {editingAd && workspace && (
-        <EditMetadataDialog
-          ad={editingAd}
-          open={!!editingAd}
-          onClose={() => setEditingAd(null)}
-          workspaceId={workspace.id}
-          onSaved={reloadLifecycle}
+      {editingCreative && (
+        <EditCreativeDialog
+          creative={editingCreative}
+          open={!!editingCreative}
+          onClose={() => setEditingCreative(null)}
+          onSaved={loadData}
         />
       )}
     </div>

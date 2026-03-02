@@ -55,6 +55,71 @@ export type Database = {
           },
         ]
       }
+      ad_creatives: {
+        Row: {
+          ad_id: string
+          ad_name: string
+          adset_id: string | null
+          angle: string | null
+          campaign_id: string | null
+          created_at: string | null
+          creative_type: string | null
+          cta: string | null
+          first_seen_at: string | null
+          hook: string | null
+          id: string
+          lifecycle_stage: string | null
+          lifecycle_updated_at: string | null
+          status: string | null
+          thumbnail_url: string | null
+          workspace_id: string
+        }
+        Insert: {
+          ad_id: string
+          ad_name: string
+          adset_id?: string | null
+          angle?: string | null
+          campaign_id?: string | null
+          created_at?: string | null
+          creative_type?: string | null
+          cta?: string | null
+          first_seen_at?: string | null
+          hook?: string | null
+          id?: string
+          lifecycle_stage?: string | null
+          lifecycle_updated_at?: string | null
+          status?: string | null
+          thumbnail_url?: string | null
+          workspace_id: string
+        }
+        Update: {
+          ad_id?: string
+          ad_name?: string
+          adset_id?: string | null
+          angle?: string | null
+          campaign_id?: string | null
+          created_at?: string | null
+          creative_type?: string | null
+          cta?: string | null
+          first_seen_at?: string | null
+          hook?: string | null
+          id?: string
+          lifecycle_stage?: string | null
+          lifecycle_updated_at?: string | null
+          status?: string | null
+          thumbnail_url?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_creatives_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alert_events: {
         Row: {
           context_json: Json | null
@@ -384,6 +449,68 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "connectors_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creative_daily_metrics: {
+        Row: {
+          ad_id: string
+          clicks: number | null
+          cpc: number | null
+          cpl: number | null
+          cpm: number | null
+          created_at: string | null
+          ctr: number | null
+          date: string
+          frequency: number | null
+          id: string
+          impressions: number | null
+          leads: number | null
+          reach: number | null
+          spend: number | null
+          workspace_id: string
+        }
+        Insert: {
+          ad_id: string
+          clicks?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date: string
+          frequency?: number | null
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          reach?: number | null
+          spend?: number | null
+          workspace_id: string
+        }
+        Update: {
+          ad_id?: string
+          clicks?: number | null
+          cpc?: number | null
+          cpl?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          date?: string
+          frequency?: number | null
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          reach?: number | null
+          spend?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_daily_metrics_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
