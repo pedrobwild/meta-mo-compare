@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarIcon, ArrowRightLeft, Search, Filter, Layers } from 'lucide-react';
+import { CalendarIcon, ArrowRightLeft, Search, Layers, Download, RefreshCw } from 'lucide-react';
 import { useAppState } from '@/lib/store';
 import { getDateBounds, getDateRangeLabel } from '@/lib/calculations';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,8 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import MetaSyncButton from './MetaSyncButton';
 import { cn } from '@/lib/utils';
-import type { TruthSource, AnalysisLevel } from '@/lib/types';
+import type { AnalysisLevel } from '@/lib/types';
 import type { DateRange } from 'react-day-picker';
 
 const PRESETS = [
@@ -37,9 +38,7 @@ export default function GlobalFilters() {
 
   const handleMainSelect = (range: DateRange | undefined) => {
     if (range?.from && range?.to) {
-      const from = format(range.from, 'yyyy-MM-dd');
-      const to = format(range.to, 'yyyy-MM-dd');
-      dispatch({ type: 'SET_DATE_RANGE', from, to });
+      dispatch({ type: 'SET_DATE_RANGE', from: format(range.from, 'yyyy-MM-dd'), to: format(range.to, 'yyyy-MM-dd') });
       setMainOpen(false);
     }
   };
@@ -60,9 +59,7 @@ export default function GlobalFilters() {
 
   const applyMonthPreset = (offset: number) => {
     const ref = offset === 0 ? new Date() : subMonths(new Date(), 1);
-    const from = format(startOfMonth(ref), 'yyyy-MM-dd');
-    const to = format(endOfMonth(ref), 'yyyy-MM-dd');
-    dispatch({ type: 'SET_DATE_RANGE', from, to });
+    dispatch({ type: 'SET_DATE_RANGE', from: format(startOfMonth(ref), 'yyyy-MM-dd'), to: format(endOfMonth(ref), 'yyyy-MM-dd') });
   };
 
   const mainLabel = state.dateFrom && state.dateTo
@@ -73,24 +70,35 @@ export default function GlobalFilters() {
     ? getDateRangeLabel(state.comparisonFrom, state.comparisonTo)
     : 'Comparar';
 
+  const activePreset = (() => {
+    if (!state.dateFrom || !state.dateTo || !bounds) return null;
+    const maxDate = new Date(bounds.max + 'T00:00:00');
+    const to = format(maxDate, 'yyyy-MM-dd');
+    if (state.dateTo !== to) return null;
+    for (const p of PRESETS) {
+      const from = format(subDays(maxDate, p.days - 1), 'yyyy-MM-dd');
+      if (state.dateFrom === from) return p.days;
+    }
+    return null;
+  })();
+
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      {/* Quick presets */}
-      <div className="flex items-center gap-0.5">
+    <div className="flex items-center gap-2.5 flex-wrap">
+      {/* Period pill presets */}
+      <div className="flex items-center gap-1">
         {PRESETS.map(p => (
-          <Button
+          <button
             key={p.days}
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-secondary"
             onClick={() => applyPreset(p.days)}
+            className={cn(
+              'meta-pill meta-button-press',
+              activePreset === p.days ? 'meta-pill-active' : 'meta-pill-inactive'
+            )}
           >
             {p.label}
-          </Button>
+          </button>
         ))}
       </div>
-
-      <div className="h-4 w-px bg-border" />
 
       {/* Date Range Picker */}
       <Popover open={mainOpen} onOpenChange={setMainOpen}>
@@ -99,25 +107,25 @@ export default function GlobalFilters() {
             variant="outline"
             size="sm"
             className={cn(
-              'h-7 gap-1.5 text-[11px] font-mono bg-surface-2/50 border-border hover:border-primary/30 hover:bg-surface-2',
+              'h-8 gap-1.5 text-meta-body rounded-meta-btn border-border hover:bg-secondary meta-button-press',
               !state.dateFrom && 'text-muted-foreground'
             )}
           >
-            <CalendarIcon className="h-3 w-3" />
+            <CalendarIcon className="h-3.5 w-3.5" strokeWidth={1.5} />
             {mainLabel}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        <PopoverContent className="w-auto p-0 rounded-meta-card shadow-meta-card" align="start">
           <div className="flex flex-wrap gap-1 p-2 pb-0 border-b border-border">
             {PRESETS.map(p => (
-              <Button key={p.days} variant="ghost" size="sm" className="text-[10px] h-6 px-2" onClick={() => { applyPreset(p.days); setMainOpen(false); }}>
+              <Button key={p.days} variant="ghost" size="sm" className="text-[10px] h-6 px-2 rounded-meta-btn" onClick={() => { applyPreset(p.days); setMainOpen(false); }}>
                 {p.label}
               </Button>
             ))}
-            <Button variant="ghost" size="sm" className="text-[10px] h-6 px-2" onClick={() => { applyMonthPreset(0); setMainOpen(false); }}>
+            <Button variant="ghost" size="sm" className="text-[10px] h-6 px-2 rounded-meta-btn" onClick={() => { applyMonthPreset(0); setMainOpen(false); }}>
               Mês atual
             </Button>
-            <Button variant="ghost" size="sm" className="text-[10px] h-6 px-2" onClick={() => { applyMonthPreset(-1); setMainOpen(false); }}>
+            <Button variant="ghost" size="sm" className="text-[10px] h-6 px-2 rounded-meta-btn" onClick={() => { applyMonthPreset(-1); setMainOpen(false); }}>
               Mês anterior
             </Button>
           </div>
@@ -126,48 +134,48 @@ export default function GlobalFilters() {
             selected={{ from: mainFrom, to: mainTo }}
             onSelect={handleMainSelect}
             numberOfMonths={2}
-            className={cn('p-3 pointer-events-auto')}
+            className="p-3 pointer-events-auto"
             locale={ptBR}
           />
         </PopoverContent>
       </Popover>
 
-      {/* Comparison Range */}
+      {/* Comparison */}
       <Popover open={compOpen} onOpenChange={setCompOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
             size="sm"
             className={cn(
-              'h-7 gap-1.5 text-[11px] font-mono bg-surface-2/50 border-border hover:border-primary/30',
+              'h-8 gap-1.5 text-meta-body rounded-meta-btn border-border hover:bg-secondary meta-button-press',
               !state.comparisonFrom && 'text-muted-foreground'
             )}
           >
-            <ArrowRightLeft className="h-3 w-3" />
+            <ArrowRightLeft className="h-3.5 w-3.5" strokeWidth={1.5} />
             {compLabel}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        <PopoverContent className="w-auto p-0 rounded-meta-card shadow-meta-card" align="start">
           <Calendar
             mode="range"
             selected={{ from: compFrom, to: compTo }}
             onSelect={handleCompSelect}
             numberOfMonths={2}
-            className={cn('p-3 pointer-events-auto')}
+            className="p-3 pointer-events-auto"
             locale={ptBR}
           />
         </PopoverContent>
       </Popover>
 
-      <div className="h-4 w-px bg-border" />
+      <div className="h-5 w-px bg-border" />
 
       {/* Analysis Level */}
       <Select value={state.analysisLevel} onValueChange={l => dispatch({ type: 'SET_ANALYSIS_LEVEL', level: l as AnalysisLevel })}>
-        <SelectTrigger className="h-7 w-auto gap-1 text-[11px] bg-surface-2/50 border-border px-2 [&>svg]:h-3 [&>svg]:w-3">
-          <Layers className="h-3 w-3 text-muted-foreground mr-1" />
+        <SelectTrigger className="h-8 w-auto gap-1 text-meta-body border-border px-2.5 rounded-meta-btn [&>svg]:h-3 [&>svg]:w-3">
+          <Layers className="h-3.5 w-3.5 text-muted-foreground mr-1" strokeWidth={1.5} />
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="rounded-meta-card shadow-meta-card">
           <SelectItem value="campaign">Campanha</SelectItem>
           <SelectItem value="adset">Conjunto</SelectItem>
           <SelectItem value="ad">Anúncio</SelectItem>
@@ -176,12 +184,12 @@ export default function GlobalFilters() {
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
         <Input
           placeholder="Buscar..."
           value={state.searchQuery}
           onChange={e => dispatch({ type: 'SET_SEARCH_QUERY', query: e.target.value })}
-          className="h-7 w-36 pl-7 text-[11px] bg-surface-2/50 border-border focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
+          className="h-8 w-40 pl-8 text-meta-body border-border rounded-meta-btn focus:border-primary focus:ring-2 focus:ring-primary/20"
         />
       </div>
 
@@ -190,9 +198,14 @@ export default function GlobalFilters() {
         <Switch
           checked={state.includeInactive}
           onCheckedChange={v => dispatch({ type: 'SET_INCLUDE_INACTIVE', value: v })}
-          className="scale-75"
+          className="scale-[0.85]"
         />
-        <Label className="text-[10px] text-muted-foreground">Inativos</Label>
+        <Label className="text-meta-caption text-muted-foreground">Inativos</Label>
+      </div>
+
+      {/* Right-side actions */}
+      <div className="ml-auto flex items-center gap-2">
+        <MetaSyncButton />
       </div>
     </div>
   );
