@@ -95,8 +95,8 @@ export default function ActionCenter() {
       : new Date().toISOString().slice(0, 10);
 
     const { data: { user } } = await supabase.auth.getUser();
-    const actionMap: Record<string, string> = { done: 'scale', ignored: 'pause' };
 
+    // Legacy decisions_log
     await supabase.from('decisions_log').insert({
       workspace_id: workspace.id,
       period_key: periodKey,
@@ -107,6 +107,23 @@ export default function ActionCenter() {
       expected_result: action.what_to_do,
       user_id: user?.id || null,
       notes: reasonInput[action.id] || null,
+    } as any);
+
+    // Also log to optimization_log for the new Decisions module
+    await supabase.from('optimization_log').insert({
+      workspace_id: workspace.id,
+      created_by: user?.id || null,
+      decision_type: status === 'done' ? 'escalar' : 'pausar',
+      entity_type: action.entity_level || 'campaign',
+      entity_id: action.entity_id || action.id,
+      entity_name: action.title,
+      reason: action.why,
+      action_taken: action.what_to_do,
+      expected_impact: action.what_to_do,
+      status: 'monitoring',
+      tags: ['action-center'],
+      notes: reasonInput[action.id] || null,
+      action_center_id: action.id.startsWith('auto-') ? null : action.id,
     } as any);
   };
 

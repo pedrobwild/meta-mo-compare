@@ -1875,6 +1875,97 @@ export type Database = {
           },
         ]
       }
+      optimization_log: {
+        Row: {
+          action_center_id: string | null
+          action_taken: string
+          actual_impact: string | null
+          alert_id: string | null
+          created_at: string
+          created_by: string | null
+          decision_type: string
+          entity_id: string
+          entity_name: string
+          entity_type: string
+          expected_impact: string | null
+          id: string
+          impact_confirmed_at: string | null
+          metric_after: Json | null
+          metric_before: Json | null
+          notes: string | null
+          reason: string
+          status: string
+          tags: string[] | null
+          workspace_id: string
+        }
+        Insert: {
+          action_center_id?: string | null
+          action_taken?: string
+          actual_impact?: string | null
+          alert_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          decision_type?: string
+          entity_id?: string
+          entity_name?: string
+          entity_type?: string
+          expected_impact?: string | null
+          id?: string
+          impact_confirmed_at?: string | null
+          metric_after?: Json | null
+          metric_before?: Json | null
+          notes?: string | null
+          reason?: string
+          status?: string
+          tags?: string[] | null
+          workspace_id: string
+        }
+        Update: {
+          action_center_id?: string | null
+          action_taken?: string
+          actual_impact?: string | null
+          alert_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          decision_type?: string
+          entity_id?: string
+          entity_name?: string
+          entity_type?: string
+          expected_impact?: string | null
+          id?: string
+          impact_confirmed_at?: string | null
+          metric_after?: Json | null
+          metric_before?: Json | null
+          notes?: string | null
+          reason?: string
+          status?: string
+          tags?: string[] | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "optimization_log_action_center_id_fkey"
+            columns: ["action_center_id"]
+            isOneToOne: false
+            referencedRelation: "recommendations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "optimization_log_alert_id_fkey"
+            columns: ["alert_id"]
+            isOneToOne: false
+            referencedRelation: "alert_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "optimization_log_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recommendations: {
         Row: {
           confidence: number | null
