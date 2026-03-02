@@ -35,6 +35,7 @@ import AIChatPanel from '@/components/AIChatPanel';
 import AIRecommendationsPanel from '@/components/AIRecommendationsPanel';
 import FunnelRealView from '@/components/FunnelRealView';
 import CreativesView from '@/components/CreativesView';
+import LeadsView from '@/components/LeadsView';
 import Auth from '@/pages/Auth';
 
 function EmptyState() {
@@ -176,6 +177,9 @@ function DashboardContent() {
               )}
               {activeTab === 'funnel-real' && (
                 <ViewContainer key="funnel-real"><FunnelRealView /></ViewContainer>
+              )}
+              {activeTab === 'leads' && (
+                <ViewContainer key="leads"><LeadsView /></ViewContainer>
               )}
               {activeTab === 'creatives' && hasData && (
                 <ViewContainer key="creatives"><CreativesView /></ViewContainer>
