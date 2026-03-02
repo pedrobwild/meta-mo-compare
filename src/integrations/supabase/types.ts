@@ -736,6 +736,101 @@ export type Database = {
           },
         ]
       }
+      experiments: {
+        Row: {
+          campaign_id: string | null
+          control_ad_id: string | null
+          control_description: string
+          created_at: string
+          created_by: string | null
+          decision: string | null
+          delta_pct: number | null
+          ended_at: string | null
+          hypothesis: string
+          id: string
+          learning: string | null
+          min_sample_spend: number
+          name: string
+          platform: string
+          primary_metric: string
+          result_control: Json | null
+          result_variation: Json | null
+          secondary_metrics: string[] | null
+          started_at: string | null
+          status: string
+          success_threshold: number
+          variable_tested: string
+          variation_ad_id: string | null
+          variation_description: string
+          winner: string | null
+          workspace_id: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          control_ad_id?: string | null
+          control_description?: string
+          created_at?: string
+          created_by?: string | null
+          decision?: string | null
+          delta_pct?: number | null
+          ended_at?: string | null
+          hypothesis?: string
+          id?: string
+          learning?: string | null
+          min_sample_spend?: number
+          name?: string
+          platform?: string
+          primary_metric?: string
+          result_control?: Json | null
+          result_variation?: Json | null
+          secondary_metrics?: string[] | null
+          started_at?: string | null
+          status?: string
+          success_threshold?: number
+          variable_tested?: string
+          variation_ad_id?: string | null
+          variation_description?: string
+          winner?: string | null
+          workspace_id: string
+        }
+        Update: {
+          campaign_id?: string | null
+          control_ad_id?: string | null
+          control_description?: string
+          created_at?: string
+          created_by?: string | null
+          decision?: string | null
+          delta_pct?: number | null
+          ended_at?: string | null
+          hypothesis?: string
+          id?: string
+          learning?: string | null
+          min_sample_spend?: number
+          name?: string
+          platform?: string
+          primary_metric?: string
+          result_control?: Json | null
+          result_variation?: Json | null
+          secondary_metrics?: string[] | null
+          started_at?: string | null
+          status?: string
+          success_threshold?: number
+          variable_tested?: string
+          variation_ad_id?: string | null
+          variation_description?: string
+          winner?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "experiments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       facts_funnel_daily: {
         Row: {
           created_at: string

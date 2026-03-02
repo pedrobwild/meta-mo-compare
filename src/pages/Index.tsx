@@ -37,6 +37,7 @@ import FunnelRealView from '@/components/FunnelRealView';
 import CreativesView from '@/components/CreativesView';
 import LeadsView from '@/components/LeadsView';
 import InstagramView from '@/components/InstagramView';
+import ExperimentsView from '@/components/ExperimentsView';
 import Auth from '@/pages/Auth';
 
 function EmptyState() {
@@ -196,6 +197,9 @@ function DashboardContent() {
               )}
               {activeTab === 'decisions' && (
                 <ViewContainer key="decisions"><DecisionsModule /></ViewContainer>
+              )}
+              {activeTab === 'experiments' && (
+                <ViewContainer key="experiments"><ExperimentsView /></ViewContainer>
               )}
               {activeTab === 'health' && (
                 <ViewContainer key="health"><DataHealthView /></ViewContainer>
