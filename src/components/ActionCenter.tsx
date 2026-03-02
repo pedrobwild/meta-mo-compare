@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { useWorkspace } from '@/lib/workspace';
-import { useFilteredRecords } from '@/lib/store';
+import { useAppState, useFilteredRecords } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
 import { generateRecommendations } from '@/lib/alerts/engine';
 import { aggregateInsights } from '@/lib/metrics/aggregate';
 import { CheckCircle, XCircle, AlertTriangle, Zap, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 
 interface ActionItem {
   id: string;
@@ -24,12 +26,13 @@ interface ActionItem {
 
 export default function ActionCenter() {
   const { workspace } = useWorkspace();
+  const { state } = useAppState();
   const { current, previous } = useFilteredRecords();
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [dbRecs, setDbRecs] = useState<any[]>([]);
+  const [reasonInput, setReasonInput] = useState<Record<string, string>>({});
 
-  // Load persisted recommendations
   useEffect(() => {
     if (!workspace) return;
     supabase
@@ -40,7 +43,6 @@ export default function ActionCenter() {
       .then(({ data }) => setDbRecs(data || []));
   }, [workspace]);
 
-  // Generate recommendations from current data
   useEffect(() => {
     if (current.length === 0) return;
 
@@ -60,7 +62,6 @@ export default function ActionCenter() {
 
     const recs = generateRecommendations(currentAgg, previousAgg);
 
-    // Merge with DB recs
     const merged: ActionItem[] = [
       ...dbRecs.map((r: any) => ({
         id: r.id,
@@ -87,17 +88,42 @@ export default function ActionCenter() {
     setActions(merged);
   }, [current, previous, dbRecs]);
 
+  const logDecisionToDb = async (action: ActionItem, status: 'done' | 'ignored') => {
+    if (!workspace) return;
+    const periodKey = state.dateFrom && state.dateTo
+      ? `${state.dateFrom}_${state.dateTo}`
+      : new Date().toISOString().slice(0, 10);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const actionMap: Record<string, string> = { done: 'scale', ignored: 'pause' };
+
+    await supabase.from('decisions_log').insert({
+      workspace_id: workspace.id,
+      period_key: periodKey,
+      item_key: action.entity_id || action.id,
+      item_name: action.title,
+      action_type: status === 'done' ? 'scale' : 'pause',
+      reason: action.why,
+      expected_result: action.what_to_do,
+      user_id: user?.id || null,
+      notes: reasonInput[action.id] || null,
+    } as any);
+  };
+
   const handleAction = async (id: string, status: 'done' | 'ignored') => {
+    const action = actions.find(a => a.id === id);
+    if (!action) return;
+
     setActions(prev => prev.map(a => a.id === id ? { ...a, status } : a));
-    
+
+    // Always log to decisions_log
+    await logDecisionToDb(action, status);
+
     if (!id.startsWith('auto-') && workspace) {
       await supabase.from('recommendations').update({ status }).eq('id', id);
-      await supabase.from('audit_log').insert({
-        workspace_id: workspace.id,
-        action: `recommendation_${status}`,
-        payload_json: { recommendation_id: id },
-      });
     }
+
+    toast.success(`Decisão registrada: ${status === 'done' ? 'Executada' : 'Ignorada'}`);
   };
 
   const openActions = actions.filter(a => a.status === 'open');
@@ -171,10 +197,22 @@ export default function ActionCenter() {
                             <span className="text-muted-foreground font-medium">O que fazer:</span>
                             <p className="text-foreground/80 mt-0.5">{action.what_to_do}</p>
                           </div>
+                          <div>
+                            <Textarea
+                              placeholder="Justificativa / notas (opcional)..."
+                              className="text-xs h-16 bg-background/50"
+                              value={reasonInput[action.id] || ''}
+                              onChange={e => {
+                                e.stopPropagation();
+                                setReasonInput(prev => ({ ...prev, [action.id]: e.target.value }));
+                              }}
+                              onClick={e => e.stopPropagation()}
+                            />
+                          </div>
                           <div className="flex gap-2 pt-1">
                             <Button size="sm" variant="outline" className="text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
                               onClick={e => { e.stopPropagation(); handleAction(action.id, 'done'); }}>
-                              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Feito
+                              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Executar
                             </Button>
                             <Button size="sm" variant="outline" className="text-muted-foreground hover:bg-muted/20"
                               onClick={e => { e.stopPropagation(); handleAction(action.id, 'ignored'); }}>

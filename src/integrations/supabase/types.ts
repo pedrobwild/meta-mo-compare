@@ -348,31 +348,40 @@ export type Database = {
         Row: {
           action_type: string
           created_at: string
+          expected_result: string | null
           id: string
           item_key: string
           item_name: string
+          notes: string | null
           period_key: string
           reason: string | null
+          user_id: string | null
           workspace_id: string | null
         }
         Insert: {
           action_type: string
           created_at?: string
+          expected_result?: string | null
           id?: string
           item_key: string
           item_name: string
+          notes?: string | null
           period_key: string
           reason?: string | null
+          user_id?: string | null
           workspace_id?: string | null
         }
         Update: {
           action_type?: string
           created_at?: string
+          expected_result?: string | null
           id?: string
           item_key?: string
           item_name?: string
+          notes?: string | null
           period_key?: string
           reason?: string | null
+          user_id?: string | null
           workspace_id?: string | null
         }
         Relationships: [
