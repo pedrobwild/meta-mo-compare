@@ -547,6 +547,20 @@ Deno.serve(async (req) => {
     }
 
     // Also write to legacy meta_records for backward compatibility
+    // Build lookup maps for effective_status from already-fetched entities
+    const campaignStatusMap = new Map<string, string>();
+    for (const c of campaigns) {
+      if (c.id && c.effective_status) campaignStatusMap.set(c.id, c.effective_status);
+    }
+    const adsetStatusMap = new Map<string, string>();
+    for (const a of adsets) {
+      if (a.id && a.effective_status) adsetStatusMap.set(a.id, a.effective_status);
+    }
+    const adStatusMap = new Map<string, string>();
+    for (const a of ads) {
+      if (a.id && a.effective_status) adStatusMap.set(a.id, a.effective_status);
+    }
+
     let legacyUpserted = 0;
     const legacyRows = insights.map((ins: any) => {
       const adName = ins.ad_name || '';
@@ -563,6 +577,12 @@ Deno.serve(async (req) => {
       const resultsLeads = getActionValue(ins.actions, 'lead') || getActionValue(ins.actions, 'onsite_conversion.messaging_first_reply') || (ins.actions?.length ? parseFloat(ins.actions[0].value) || 0 : 0);
       const lpv = getActionValue(ins.actions, 'landing_page_view');
 
+      // Determine delivery_status from the most specific entity level available
+      const adEffective = adStatusMap.get(ins.ad_id) || null;
+      const adsetEffective = adsetStatusMap.get(ins.adset_id) || null;
+      const campaignEffective = campaignStatusMap.get(ins.campaign_id) || null;
+      const deliveryStatus = adEffective || adsetEffective || campaignEffective;
+
       return {
         unique_key: uniqueKey,
         workspace_id: workspaceId,
@@ -578,7 +598,7 @@ Deno.serve(async (req) => {
         ad_name: adName,
         campaign_name: campaignName,
         adset_name: adsetName,
-        delivery_status: null,
+        delivery_status: deliveryStatus,
         delivery_level: null,
         result_type: null,
         results: resultsLeads,
