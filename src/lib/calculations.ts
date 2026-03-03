@@ -158,12 +158,18 @@ export function groupByLevel(
     const previousMetrics = prevRecs.length > 0 ? aggregateMetrics(prevRecs) : null;
     const delta = computeDeltas(metrics, previousMetrics);
 
-    // Derive status: active if any record has non-inactive delivery_status or has spend
+    // Derive status: active if any record has active delivery_status or has spend in period
     const hasActiveRecord = recs.some(r => {
-      const ds = (r.delivery_status || '').toLowerCase();
-      return ds === '' || ds === 'active' || ds === 'ativo' || ds === 'in_progress' || ds === 'em veiculação';
+      const ds = (r.delivery_status || '').toUpperCase();
+      return ds === 'ACTIVE' || ds === 'ATIVO' || ds === 'IN_PROGRESS' || ds === 'EM VEICULAÇÃO' || ds === '';
     });
-    const status: 'active' | 'inactive' = (hasActiveRecord || metrics.spend_brl > 0) ? 'active' : 'inactive';
+    const hasPausedRecord = recs.some(r => {
+      const ds = (r.delivery_status || '').toUpperCase();
+      return ds === 'PAUSED' || ds === 'CAMPAIGN_PAUSED' || ds === 'ADSET_PAUSED' || ds === 'DELETED' || ds === 'ARCHIVED';
+    });
+    const status: 'active' | 'inactive' = hasPausedRecord && !hasActiveRecord && metrics.spend_brl === 0
+      ? 'inactive'
+      : (hasActiveRecord || metrics.spend_brl > 0) ? 'active' : 'inactive';
 
     rows.push({ key, name, metrics, previousMetrics, delta, records: recs, status });
   }
