@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/lib/workspace';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import CampaignLeadsRanking from './CampaignLeadsRanking';
 
 interface MetaLead {
   id: string;
@@ -183,7 +184,17 @@ export default function LeadsView() {
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/webhook-meta-leads`;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Ranking de leads por campanha (API Meta) */}
+      <CampaignLeadsRanking />
+
+      {/* Divider */}
+      <div className="flex items-center gap-3 pt-2">
+        <div className="h-px flex-1 bg-border" />
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Lead Ads (formulários)</span>
+        <div className="h-px flex-1 bg-border" />
+      </div>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
