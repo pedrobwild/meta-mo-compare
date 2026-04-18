@@ -1,7 +1,8 @@
 import {
   Eye, Crosshair, ChartScatter, Activity, Calculator, FileText,
   History, GitBranch, Lightbulb, BarChart3, Bell, Zap, Bot, LogOut,
-  Users, Palette, Contact, Instagram, FlaskConical, Link2, Gauge, Search, UserCircle
+  Users, Palette, Contact, Instagram, FlaskConical, Link2, Gauge, Search, UserCircle,
+  AlertOctagon, TrendingUp, SplitSquareHorizontal,
 } from 'lucide-react';
 import { useAppState } from '@/lib/store';
 import { useWorkspace } from '@/lib/workspace';
@@ -22,7 +23,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
-export type Tab = 'executive' | 'tactical' | 'diagnostic' | 'funnel' | 'funnel-real' | 'leads' | 'instagram' | 'creatives' | 'simulator' | 'report' | 'decisions' | 'experiments' | 'utm-builder' | 'benchmarks' | 'health' | 'missing' | 'alerts' | 'actions' | 'ai' | 'personas';
+export type Tab = 'executive' | 'tactical' | 'diagnostic' | 'funnel' | 'funnel-real' | 'leads' | 'instagram' | 'creatives' | 'simulator' | 'report' | 'decisions' | 'experiments' | 'ab-test' | 'anomalies' | 'forecast' | 'utm-builder' | 'benchmarks' | 'health' | 'missing' | 'alerts' | 'actions' | 'ai' | 'personas';
 
 const NAV_GROUPS = [
   {
@@ -36,6 +37,14 @@ const NAV_GROUPS = [
       { key: 'alerts' as Tab, label: 'Alertas', icon: Bell },
       { key: 'actions' as Tab, label: 'Ações', icon: Zap },
       { key: 'ai' as Tab, label: 'IA Analyst', icon: Bot },
+    ],
+  },
+  {
+    label: 'ESTATÍSTICA',
+    items: [
+      { key: 'ab-test' as Tab, label: 'A/B Test', icon: SplitSquareHorizontal },
+      { key: 'anomalies' as Tab, label: 'Anomalias', icon: AlertOctagon },
+      { key: 'forecast' as Tab, label: 'Forecast', icon: TrendingUp },
     ],
   },
   {

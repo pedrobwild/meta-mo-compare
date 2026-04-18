@@ -1,9 +1,23 @@
-import type { AggregatedMetrics, DeltaMetrics, LeadQualityMetrics, CreativeLifecycleRecord } from '../types';
+import type { AggregatedMetrics, DeltaMetrics, LeadQualityMetrics, CreativeLifecycleRecord, MetaRecord } from '../types';
 import { CREATIVE_LIFESPAN } from '../types';
 import type { GroupedRow } from '../calculations';
 import type { InsightCard } from './types';
 import { THRESHOLDS } from './thresholds';
 import { computeConfidence } from './score';
+import {
+  anomalyInsights,
+  diminishingReturnsInsights,
+  significantMovers,
+  pacingInsights,
+} from './advanced';
+
+/** Extra context for statistically-grounded rules. Optional so older callers keep working. */
+export interface AdvancedContext {
+  records?: MetaRecord[];
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  spendTarget?: number | undefined;
+}
 
 // I1: CTR engana — high CTR but low LPV rate
 function checkCTRDeception(metrics: AggregatedMetrics): InsightCard | null {
@@ -587,7 +601,8 @@ export function generateInsights(
   rows: GroupedRow[],
   leadQuality?: LeadQualityMetrics | null,
   leadQualityByKey?: Record<string, LeadQualityMetrics>,
-  creatives?: CreativeLifecycleRecord[]
+  creatives?: CreativeLifecycleRecord[],
+  advanced?: AdvancedContext,
 ): InsightCard[] {
   const insights: InsightCard[] = [];
   if (metrics.spend_brl < THRESHOLDS.min_spend_for_insight) return insights;
@@ -648,6 +663,29 @@ export function generateInsights(
   // I21: Entity-level cross-diagnostics
   insights.push(...checkEntityCrossDiagnostics(rows, metrics));
 
+  // ── Statistically-grounded rules (opt-in via `advanced`) ──
+  if (advanced?.records && advanced.records.length > 0) {
+    insights.push(...anomalyInsights(advanced.records));
+    if (advanced.dateFrom && advanced.dateTo) {
+      insights.push(
+        ...pacingInsights(advanced.records, advanced.dateFrom, advanced.dateTo, advanced.spendTarget),
+      );
+    }
+  }
+  if (rows.length > 0) {
+    insights.push(...diminishingReturnsInsights(rows, metrics.spend_brl));
+    insights.push(...significantMovers(rows));
+  }
+
+  // Deduplicate by id in case the same rule fires twice across variants.
+  const seen = new Set<string>();
+  const unique: InsightCard[] = [];
+  for (const insight of insights) {
+    if (seen.has(insight.id)) continue;
+    seen.add(insight.id);
+    unique.push(insight);
+  }
+
   const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-  return insights.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+  return unique.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
 }
