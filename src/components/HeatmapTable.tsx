@@ -1,4 +1,5 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useRef, useState, useCallback } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAppState, useFilteredRecords } from '@/lib/store';
 import { useCrossFilter } from '@/lib/crossFilter';
 import {
@@ -185,6 +186,23 @@ export default function HeatmapTable() {
     setSortAsc(false);
   }, []);
 
+  // Virtualize only when the sorted list is large. Below the threshold, the
+  // classic table markup is fine and keeps sticky columns / headers dead
+  // simple; above it, we switch to a fixed-height scrollable body.
+  //
+  // These hooks must stay ABOVE the early `return null` so hook order is
+  // stable across renders (rules-of-hooks).
+  const ROW_HEIGHT = 64;
+  const VIRTUAL_THRESHOLD = 50;
+  const shouldVirtualize = sorted.length > VIRTUAL_THRESHOLD;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: sorted.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10,
+  });
+
   if (sorted.length === 0 && drillPath.length === 0) return null;
 
   const SortIcon = ({ col }: { col: SortKey }) => {
@@ -245,96 +263,131 @@ export default function HeatmapTable() {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b-2 border-border bg-secondary/40">
-                <th className="text-left p-3 text-meta-label text-muted-foreground font-medium cursor-pointer hover:text-foreground sticky left-0 bg-secondary/40 z-10 min-w-[200px]"
-                  onClick={() => toggleSort('name')}>
-                  <span className="flex items-center gap-1">Nome <SortIcon col="name" /></span>
-                </th>
-                <th className="text-center p-3 text-meta-label text-muted-foreground font-medium cursor-pointer hover:text-foreground min-w-[80px]"
-                  onClick={() => toggleSort('verdict')}>
-                  <span className="flex items-center justify-center gap-1">Score <SortIcon col="verdict" /></span>
-                </th>
-                {columns.map(col => (
-                  <th key={col.key}
-                    className="text-right p-3 text-meta-label text-muted-foreground font-medium cursor-pointer hover:text-foreground whitespace-nowrap"
-                    onClick={() => toggleSort(col.key)}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="flex items-center justify-end gap-1">
-                          {col.shortLabel} <SortIcon col={col.key} />
-                          <Info className="h-3 w-3 opacity-30" strokeWidth={1.5} />
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-[240px] rounded-meta-card shadow-meta-card">
-                        <p className="text-meta-caption">{col.tooltip}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.length === 0 ? (
-                <tr>
-                  <td colSpan={columns.length + 2} className="p-12 text-center">
-                    <p className="text-meta-heading-sm text-foreground mb-1">Nenhum dado encontrado</p>
-                    <p className="text-meta-body text-muted-foreground">
-                      {drillPath.length > 0 ? (
-                        <button className="text-primary hover:underline" onClick={() => handleBreadcrumbClick(drillPath.length - 2)}>
-                          Voltar ao nível anterior
-                        </button>
-                      ) : 'Ajuste os filtros para ver resultados'}
-                    </p>
+        {(() => {
+          const virtualItems = shouldVirtualize ? virtualizer.getVirtualItems() : [];
+          const totalSize = shouldVirtualize ? virtualizer.getTotalSize() : 0;
+          const topPad = virtualItems.length > 0 ? virtualItems[0].start : 0;
+          const bottomPad =
+            virtualItems.length > 0 ? totalSize - virtualItems[virtualItems.length - 1].end : 0;
+          const visible = shouldVirtualize
+            ? virtualItems.map((vi) => sorted[vi.index])
+            : sorted;
+
+          const renderRow = ({ row, verdict }: { row: GroupedRow; verdict: VerdictResult }) => (
+            <tr
+              key={row.key}
+              className={`border-b border-border hover:bg-secondary/40 transition-colors duration-100 ${canDrillDown ? 'cursor-pointer' : ''}`}
+              onClick={canDrillDown ? () => handleDrill(row) : undefined}
+              style={{ height: `${ROW_HEIGHT}px` }}
+            >
+              <td className="px-3 max-w-[240px] sticky left-0 bg-card z-10">
+                <div className="flex items-center gap-1.5">
+                  <p className="truncate text-meta-body font-semibold text-foreground">{row.name}</p>
+                  {canDrillDown && (
+                    <span className="text-[9px] text-muted-foreground whitespace-nowrap">→ {nextLevelLabel}</span>
+                  )}
+                </div>
+              </td>
+              <td className="px-3 text-center">
+                <ScoreDisplay verdict={verdict} />
+              </td>
+              {columns.map((col) => {
+                const val = (row.metrics as any)[col.key] ?? 0;
+                const heatColor = getHeatmapColor(val, (avgMetrics as any)[col.key], INVERTED_KEYS.has(col.key));
+                const d = row.delta.deltas[col.key];
+                const hasChange = d && d.percent !== null && Math.abs(d.percent) >= 0.5;
+                const positive = d ? (col.invertDelta ? d.absolute < 0 : d.absolute > 0) : null;
+                return (
+                  <td key={col.key} className={`px-3 text-right whitespace-nowrap ${heatColor}`}>
+                    <p className="text-meta-body text-foreground">{col.format(val)}</p>
+                    {hasChange && (
+                      <span className={`text-[10px] font-medium ${positive ? 'text-positive' : 'text-negative'}`}>
+                        {d.percent! > 0 ? '+' : ''}{d.percent!.toFixed(1)}%
+                      </span>
+                    )}
                   </td>
-                </tr>
-              ) : (
-                sorted.slice(0, 50).map(({ row, verdict }) => (
-                  <tr
-                    key={row.key}
-                    className={`border-b border-border hover:bg-secondary/40 transition-colors duration-100 ${canDrillDown ? 'cursor-pointer' : ''}`}
-                    onClick={canDrillDown ? () => handleDrill(row) : undefined}
-                    style={{ height: '52px' }}
-                  >
-                    <td className="px-3 max-w-[240px] sticky left-0 bg-card z-10">
-                      <div className="flex items-center gap-1.5">
-                        <p className="truncate text-meta-body font-semibold text-foreground">{row.name}</p>
-                        {canDrillDown && (
-                          <span className="text-[9px] text-muted-foreground whitespace-nowrap">→ {nextLevelLabel}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 text-center">
-                      <ScoreDisplay verdict={verdict} />
-                    </td>
-                    {columns.map(col => {
-                      const val = (row.metrics as any)[col.key] ?? 0;
-                      const heatColor = getHeatmapColor(val, (avgMetrics as any)[col.key], INVERTED_KEYS.has(col.key));
-                      const d = row.delta.deltas[col.key];
-                      const hasChange = d && d.percent !== null && Math.abs(d.percent) >= 0.5;
-                      const positive = d ? (col.invertDelta ? d.absolute < 0 : d.absolute > 0) : null;
-                      return (
-                        <td key={col.key} className={`px-3 text-right whitespace-nowrap ${heatColor}`}>
-                          <p className="text-meta-body text-foreground">{col.format(val)}</p>
-                          {hasChange && (
-                            <span className={`text-[10px] font-medium ${positive ? 'text-positive' : 'text-negative'}`}>
-                              {d.percent! > 0 ? '+' : ''}{d.percent!.toFixed(1)}%
+                );
+              })}
+            </tr>
+          );
+
+          return (
+            <div
+              ref={scrollRef}
+              className="overflow-auto"
+              style={shouldVirtualize ? { maxHeight: '70vh' } : undefined}
+            >
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-20 bg-secondary/40 backdrop-blur-sm">
+                  <tr className="border-b-2 border-border">
+                    <th className="text-left p-3 text-meta-label text-muted-foreground font-medium cursor-pointer hover:text-foreground sticky left-0 bg-secondary/40 z-30 min-w-[200px]"
+                      onClick={() => toggleSort('name')}>
+                      <span className="flex items-center gap-1">Nome <SortIcon col="name" /></span>
+                    </th>
+                    <th className="text-center p-3 text-meta-label text-muted-foreground font-medium cursor-pointer hover:text-foreground min-w-[80px]"
+                      onClick={() => toggleSort('verdict')}>
+                      <span className="flex items-center justify-center gap-1">Score <SortIcon col="verdict" /></span>
+                    </th>
+                    {columns.map((col) => (
+                      <th key={col.key}
+                        className="text-right p-3 text-meta-label text-muted-foreground font-medium cursor-pointer hover:text-foreground whitespace-nowrap"
+                        onClick={() => toggleSort(col.key)}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="flex items-center justify-end gap-1">
+                              {col.shortLabel} <SortIcon col={col.key} />
+                              <Info className="h-3 w-3 opacity-30" strokeWidth={1.5} />
                             </span>
-                          )}
-                        </td>
-                      );
-                    })}
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[240px] rounded-meta-card shadow-meta-card">
+                            <p className="text-meta-caption">{col.tooltip}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </th>
+                    ))}
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        {sorted.length > 50 && (
-          <div className="px-4 py-3 border-t border-border flex items-center justify-between text-meta-body text-muted-foreground">
-            <span>Mostrando 1-50 de {sorted.length} itens</span>
+                </thead>
+                <tbody>
+                  {sorted.length === 0 ? (
+                    <tr>
+                      <td colSpan={columns.length + 2} className="p-12 text-center">
+                        <p className="text-meta-heading-sm text-foreground mb-1">Nenhum dado encontrado</p>
+                        <p className="text-meta-body text-muted-foreground">
+                          {drillPath.length > 0 ? (
+                            <button className="text-primary hover:underline" onClick={() => handleBreadcrumbClick(drillPath.length - 2)}>
+                              Voltar ao nível anterior
+                            </button>
+                          ) : 'Ajuste os filtros para ver resultados'}
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    <>
+                      {shouldVirtualize && topPad > 0 && (
+                        <tr aria-hidden style={{ height: `${topPad}px` }}>
+                          <td colSpan={columns.length + 2} />
+                        </tr>
+                      )}
+                      {visible.map(renderRow)}
+                      {shouldVirtualize && bottomPad > 0 && (
+                        <tr aria-hidden style={{ height: `${bottomPad}px` }}>
+                          <td colSpan={columns.length + 2} />
+                        </tr>
+                      )}
+                    </>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
+        {sorted.length > 0 && (
+          <div className="px-4 py-2 border-t border-border flex items-center justify-between text-meta-caption text-muted-foreground">
+            <span>
+              {shouldVirtualize
+                ? `${sorted.length} itens · virtualização ativa`
+                : `${sorted.length} itens`}
+            </span>
           </div>
         )}
       </div>

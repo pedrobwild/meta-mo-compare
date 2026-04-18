@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, useRef, useMemo, type ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react';
 import type { AppState, MetaRecord, ImportLog, PeriodTargets, FunnelData, LeadQualityRecord, TruthSource, AnalysisLevel, HierarchyMaps, PeriodGranularity } from './types';
 import { getDateBounds, computeComparisonRange, filterByDateRange, aggregateMetrics, computeDeltas, detectDefaultGranularity } from './calculations';
 import { buildHierarchyMaps, enrichRecords, upsertRecords } from './parser';
@@ -88,6 +88,8 @@ function reducer(state: AppState, action: Action): AppState {
       };
     }
     case 'IMPORT_FILE': {
+      // Build hierarchy maps from the full dataset so we can cross-enrich records
+      // coming from simpler exports (type1/type2) using ones from richer exports (type3).
       const maps = buildHierarchyMaps([...state.records, ...action.newRecords]);
       const enriched = enrichRecords(action.newRecords, maps);
       const records = upsertRecords(state.records, enriched);
@@ -143,30 +145,46 @@ function reducer(state: AppState, action: Action): AppState {
   }
 }
 
-function usePersistingDispatch(dispatch: React.Dispatch<Action>) {
-  return React.useCallback((action: Action) => {
+function usePersistingDispatch(
+  dispatch: React.Dispatch<Action>,
+  stateRef: React.MutableRefObject<AppState>,
+) {
+  return useCallback((action: Action) => {
     dispatch(action);
 
-    switch (action.type) {
-      case 'SET_RECORDS':
-        saveRecords(action.records);
-        break;
-      case 'IMPORT_FILE':
-        // Save the full merged records, not just the new ones
-        // The reducer upserts newRecords into state.records, so we need to persist the result
-        saveRecords(action.newRecords);
-        break;
-      case 'SET_TARGETS':
-        saveTarget(action.targets);
-        break;
-      case 'SET_FUNNEL':
-        saveFunnel(action.funnel);
-        break;
-      case 'CLEAR_ALL':
-        clearAllData();
-        break;
-    }
-  }, [dispatch]);
+    // Wait for the reducer to run, then persist from the latest state. This
+    // guarantees Supabase receives the enriched records (hierarchy-filled)
+    // rather than the raw import.
+    queueMicrotask(() => {
+      const state = stateRef.current;
+      switch (action.type) {
+        case 'SET_RECORDS':
+          saveRecords(state.records);
+          break;
+        case 'IMPORT_FILE': {
+          // Persist only rows that were added or modified by this import, but
+          // from the enriched state.
+          const incomingKeys = new Set(
+            action.newRecords.map((r) => `${r.unique_key}|${r.period_key}|${r.granularity}`),
+          );
+          const toSave = state.records.filter((r) =>
+            incomingKeys.has(`${r.unique_key}|${r.period_key}|${r.granularity}`),
+          );
+          if (toSave.length) saveRecords(toSave);
+          break;
+        }
+        case 'SET_TARGETS':
+          saveTarget(action.targets);
+          break;
+        case 'SET_FUNNEL':
+          saveFunnel(action.funnel);
+          break;
+        case 'CLEAR_ALL':
+          clearAllData();
+          break;
+      }
+    });
+  }, [dispatch, stateRef]);
 }
 
 const AppContext = createContext<{
@@ -176,7 +194,9 @@ const AppContext = createContext<{
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, rawDispatch] = useReducer(reducer, initialState);
-  const dispatch = usePersistingDispatch(rawDispatch);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const dispatch = usePersistingDispatch(rawDispatch, stateRef);
   const hydrated = useRef(false);
 
   useEffect(() => {

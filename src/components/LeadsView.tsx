@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { VirtualList } from '@/components/ui/virtual-list';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/lib/workspace';
 import { toast } from 'sonner';
@@ -303,50 +303,47 @@ export default function LeadsView() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border">
-                  <TableHead className="text-xs">Data</TableHead>
-                  <TableHead className="text-xs">Nome</TableHead>
-                  <TableHead className="text-xs">Email</TableHead>
-                  <TableHead className="text-xs">Telefone</TableHead>
-                  <TableHead className="text-xs">Campanha</TableHead>
-                  <TableHead className="text-xs">Plataforma</TableHead>
-                  <TableHead className="text-xs">Tipo</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLeads.slice(0, 100).map((lead) => (
-                  <TableRow key={lead.id} className="border-border hover:bg-surface-2/30">
-                    <TableCell className="text-xs font-mono text-muted-foreground">
-                      {new Date(lead.created_time).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                    </TableCell>
-                    <TableCell className="text-xs font-medium text-foreground">{lead.lead_name || '—'}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{lead.lead_email || '—'}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground font-mono">{lead.lead_phone || '—'}</TableCell>
-                    <TableCell className="text-xs">
-                      <span className="truncate max-w-[150px] block" title={campaigns[lead.campaign_id || ''] || lead.campaign_id || ''}>
-                        {campaigns[lead.campaign_id || ''] || (lead.campaign_id ? lead.campaign_id.slice(0, 10) + '...' : '—')}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      <Badge variant="outline" className="text-[10px]">{lead.platform}</Badge>
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      <Badge variant={lead.is_organic ? 'secondary' : 'default'} className="text-[10px]">
-                        {lead.is_organic ? 'Orgânico' : 'Pago'}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {filteredLeads.length > 100 && (
-              <div className="p-3 text-center text-xs text-muted-foreground">
-                Exibindo 100 de {filteredLeads.length} leads
-              </div>
-            )}
+          <div className="min-w-[820px]">
+            {/* Header row */}
+            <div className="grid grid-cols-[140px_1fr_1.2fr_130px_160px_100px_100px] items-center border-b border-border bg-surface-2/40 px-3 h-9 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              <span>Data</span>
+              <span>Nome</span>
+              <span>Email</span>
+              <span>Telefone</span>
+              <span>Campanha</span>
+              <span>Plataforma</span>
+              <span>Tipo</span>
+            </div>
+            <VirtualList
+              items={filteredLeads}
+              rowHeight={40}
+              getKey={(lead) => lead.id}
+              height={Math.min(560, Math.max(200, filteredLeads.length * 40))}
+              renderRow={(lead) => (
+                <div className="grid grid-cols-[140px_1fr_1.2fr_130px_160px_100px_100px] items-center border-b border-border hover:bg-surface-2/30 px-3 h-10 text-xs">
+                  <span className="font-mono text-muted-foreground">
+                    {new Date(lead.created_time).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span className="font-medium text-foreground truncate" title={lead.lead_name || ''}>{lead.lead_name || '—'}</span>
+                  <span className="text-muted-foreground truncate" title={lead.lead_email || ''}>{lead.lead_email || '—'}</span>
+                  <span className="text-muted-foreground font-mono truncate">{lead.lead_phone || '—'}</span>
+                  <span className="truncate" title={campaigns[lead.campaign_id || ''] || lead.campaign_id || ''}>
+                    {campaigns[lead.campaign_id || ''] || (lead.campaign_id ? lead.campaign_id.slice(0, 10) + '...' : '—')}
+                  </span>
+                  <span>
+                    <Badge variant="outline" className="text-[10px]">{lead.platform}</Badge>
+                  </span>
+                  <span>
+                    <Badge variant={lead.is_organic ? 'secondary' : 'default'} className="text-[10px]">
+                      {lead.is_organic ? 'Orgânico' : 'Pago'}
+                    </Badge>
+                  </span>
+                </div>
+              )}
+            />
+            <div className="px-3 py-2 text-[11px] text-muted-foreground border-t border-border">
+              Total: {filteredLeads.length} lead{filteredLeads.length !== 1 ? 's' : ''}
+            </div>
           </div>
         )}
       </div>

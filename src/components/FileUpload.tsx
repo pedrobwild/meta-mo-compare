@@ -16,11 +16,21 @@ export default function FileUpload() {
   const handleFile = useCallback(async (file: File) => {
     setProcessing(true);
     try {
-      const { records, log } = await parseFile(file);
+      const { records, log, warnings, unmatchedHeaders } = await parseFile(file);
       dispatch({ type: 'IMPORT_FILE', newRecords: records, log });
-      toast.success(`${file.name}: ${log.records_count} registros importados (${getPeriodLabel(log.period_key, log.granularity)})`);
-    } catch (err: any) {
-      toast.error(err.message || 'Erro ao processar arquivo');
+      const extras: string[] = [];
+      if (warnings.length > 0) extras.push(`${warnings.length} linha(s) ignorada(s)`);
+      if (unmatchedHeaders.length > 0) {
+        extras.push(`${unmatchedHeaders.length} coluna(s) não reconhecida(s)`);
+        // eslint-disable-next-line no-console
+        console.info('[parser] colunas não mapeadas:', unmatchedHeaders);
+      }
+      const suffix = extras.length ? ` — ${extras.join(', ')}` : '';
+      toast.success(
+        `${file.name}: ${log.records_count} registros importados (${getPeriodLabel(log.period_key, log.granularity)})${suffix}`,
+      );
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao processar arquivo');
     } finally {
       setProcessing(false);
     }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Cloud, BarChart3, Zap, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppProvider, useAppState } from '@/lib/store';
@@ -39,6 +39,17 @@ import CreativesView from '@/components/CreativesView';
 import LeadsView from '@/components/LeadsView';
 import InstagramView from '@/components/InstagramView';
 import ExperimentsView from '@/components/ExperimentsView';
+import ABTestAnalyzer from '@/components/ABTestAnalyzer';
+import AnomalyDetectionView from '@/components/AnomalyDetectionView';
+import ForecastView from '@/components/ForecastView';
+import CommandPalette from '@/components/CommandPalette';
+import SavedViewsMenu from '@/components/SavedViewsMenu';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import {
+  payloadToSearchParams,
+  searchParamsToPayload,
+  type SavedViewPayload,
+} from '@/lib/savedViews';
 import UtmBuilderView from '@/components/UtmBuilderView';
 import BenchmarksView from '@/components/BenchmarksView';
 import PersonaAudienceView from '@/components/PersonaAudienceView';
@@ -78,7 +89,13 @@ function EmptyState() {
   );
 }
 
-function ViewContainer({ children }: { children: React.ReactNode }) {
+function ViewContainer({
+  children,
+  label,
+}: {
+  children: React.ReactNode;
+  label?: string;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
@@ -86,7 +103,7 @@ function ViewContainer({ children }: { children: React.ReactNode }) {
       transition={{ duration: 0.2 }}
       className="space-y-4"
     >
-      {children}
+      <ErrorBoundary label={label}>{children}</ErrorBoundary>
     </motion.div>
   );
 }
@@ -99,9 +116,77 @@ function DashboardContent() {
   const hasData = state.records.length > 0;
   const { filter: crossFilter, clearFilter } = useCrossFilter();
 
+  // ── URL state sync ───────────────────────────────────────────────────────
+  // We hydrate from the query string on first paint (if any), then keep the
+  // URL in sync with the current filter state so deep links / refreshes
+  // preserve the user's context. We guard against re-applying our own writes
+  // by tracking `hydrated`.
+  //
+  // These hooks must stay ABOVE any early returns so the hook order is
+  // stable across renders (rules-of-hooks).
+  const hydrated = useRef(false);
+  useEffect(() => {
+    if (hydrated.current) return;
+    const sp = new URLSearchParams(window.location.search);
+    if ([...sp.keys()].length > 0) {
+      const p = searchParamsToPayload(sp);
+      if (p.activeTab) setActiveTab(p.activeTab as Tab);
+      if (p.dateFrom && p.dateTo) {
+        dispatch({ type: 'SET_DATE_RANGE', from: p.dateFrom, to: p.dateTo });
+      }
+      if (p.comparisonFrom && p.comparisonTo) {
+        dispatch({ type: 'SET_COMPARISON_RANGE', from: p.comparisonFrom, to: p.comparisonTo });
+      }
+      if (p.analysisLevel) dispatch({ type: 'SET_ANALYSIS_LEVEL', level: p.analysisLevel });
+      if (p.searchQuery) dispatch({ type: 'SET_SEARCH_QUERY', query: p.searchQuery });
+      if (typeof p.includeInactive === 'boolean') {
+        dispatch({ type: 'SET_INCLUDE_INACTIVE', value: p.includeInactive });
+      }
+      if (p.selectedGranularity) {
+        dispatch({ type: 'SET_GRANULARITY', granularity: p.selectedGranularity });
+      }
+      if (p.selectedPeriodKey) {
+        dispatch({ type: 'SET_SELECTED_PERIOD', periodKey: p.selectedPeriodKey });
+      }
+      if (p.comparisonPeriodKey) {
+        dispatch({ type: 'SET_COMPARISON_PERIOD', periodKey: p.comparisonPeriodKey });
+      }
+    }
+    hydrated.current = true;
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (!hydrated.current) return;
+    const payload: SavedViewPayload = {
+      activeTab,
+      dateFrom: state.dateFrom,
+      dateTo: state.dateTo,
+      comparisonFrom: state.comparisonFrom,
+      comparisonTo: state.comparisonTo,
+      analysisLevel: state.analysisLevel,
+      searchQuery: state.searchQuery,
+      includeInactive: state.includeInactive,
+      selectedPeriodKey: state.selectedPeriodKey,
+      comparisonPeriodKey: state.comparisonPeriodKey,
+      selectedGranularity: state.selectedGranularity,
+    };
+    const sp = payloadToSearchParams(payload);
+    const next = `${window.location.pathname}?${sp.toString()}`;
+    if (window.location.pathname + window.location.search !== next) {
+      window.history.replaceState(null, '', next);
+    }
+  }, [activeTab, state.dateFrom, state.dateTo, state.comparisonFrom, state.comparisonTo,
+      state.analysisLevel, state.searchQuery, state.includeInactive,
+      state.selectedPeriodKey, state.comparisonPeriodKey, state.selectedGranularity]);
+
   if (wsLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div
+        className="min-h-screen bg-background flex items-center justify-center"
+        role="status"
+        aria-live="polite"
+        aria-label="Carregando workspace"
+      >
         <div className="text-muted-foreground text-meta-body">Carregando...</div>
       </div>
     );
@@ -113,6 +198,30 @@ function DashboardContent() {
 
   const handleInsightFilter = (key: string, value: string) => {
     dispatch({ type: 'SET_SEARCH_QUERY', query: value });
+  };
+
+  const applyView = (p: Partial<SavedViewPayload>) => {
+    if (p.activeTab) setActiveTab(p.activeTab as Tab);
+    if (p.dateFrom && p.dateTo) {
+      dispatch({ type: 'SET_DATE_RANGE', from: p.dateFrom, to: p.dateTo });
+    }
+    if (p.comparisonFrom && p.comparisonTo) {
+      dispatch({ type: 'SET_COMPARISON_RANGE', from: p.comparisonFrom, to: p.comparisonTo });
+    }
+    if (p.analysisLevel) dispatch({ type: 'SET_ANALYSIS_LEVEL', level: p.analysisLevel });
+    if (p.searchQuery !== undefined) dispatch({ type: 'SET_SEARCH_QUERY', query: p.searchQuery });
+    if (typeof p.includeInactive === 'boolean') {
+      dispatch({ type: 'SET_INCLUDE_INACTIVE', value: p.includeInactive });
+    }
+    if (p.selectedGranularity) {
+      dispatch({ type: 'SET_GRANULARITY', granularity: p.selectedGranularity });
+    }
+    if (p.selectedPeriodKey) {
+      dispatch({ type: 'SET_SELECTED_PERIOD', periodKey: p.selectedPeriodKey });
+    }
+    if (p.comparisonPeriodKey) {
+      dispatch({ type: 'SET_COMPARISON_PERIOD', periodKey: p.comparisonPeriodKey });
+    }
   };
 
   return (
@@ -128,19 +237,28 @@ function DashboardContent() {
           <CommandHeader />
 
           <main className="flex-1 p-4 overflow-y-auto bg-background">
-            {crossFilter.key && (
-              <div className="mb-3 flex items-center gap-2">
-                <Badge variant="secondary" className="text-meta-caption flex items-center gap-1.5 px-2.5 py-1 rounded-meta-pill border border-border">
-                  Filtrando: <span className="font-semibold">{crossFilter.name}</span>
-                  <button onClick={clearFilter} className="ml-1 hover:text-destructive"><X className="h-3 w-3" /></button>
-                </Badge>
+            <div className="mb-3 flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-2 flex-wrap">
+                {crossFilter.key && (
+                  <Badge variant="secondary" className="text-meta-caption flex items-center gap-1.5 px-2.5 py-1 rounded-meta-pill border border-border">
+                    Filtrando: <span className="font-semibold">{crossFilter.name}</span>
+                    <button
+                      onClick={clearFilter}
+                      aria-label={`Limpar filtro ${crossFilter.name}`}
+                      className="ml-1 hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-sm"
+                    >
+                      <X className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  </Badge>
+                )}
               </div>
-            )}
+              {hasData && <SavedViewsMenu activeTab={activeTab} onApplyView={applyView} />}
+            </div>
             {!hasData && activeTab === 'executive' && <EmptyState />}
 
             <AnimatePresence mode="wait">
               {activeTab === 'executive' && hasData && (
-                <ViewContainer key="executive">
+                <ViewContainer key="executive" label="Executivo">
                   <AlertsBanner />
                   <ExecutiveView />
                   <PacingCard />
@@ -148,7 +266,7 @@ function DashboardContent() {
               )}
 
               {activeTab === 'tactical' && hasData && (
-                <ViewContainer key="tactical">
+                <ViewContainer key="tactical" label="Tático">
                   <AlertsBanner />
                   <TargetsEditor />
                   <OverviewCards />
@@ -162,7 +280,7 @@ function DashboardContent() {
               )}
 
               {activeTab === 'diagnostic' && hasData && (
-                <ViewContainer key="diagnostic">
+                <ViewContainer key="diagnostic" label="Diagnóstico">
                   <AdvancedCharts />
                   <OverviewCharts />
                 </ViewContainer>
@@ -180,55 +298,64 @@ function DashboardContent() {
               )}
 
               {activeTab === 'funnel' && (
-                <ViewContainer key="funnel"><FunnelView /></ViewContainer>
+                <ViewContainer key="funnel" label="Funil"><FunnelView /></ViewContainer>
               )}
               {activeTab === 'funnel-real' && (
-                <ViewContainer key="funnel-real"><FunnelRealView /></ViewContainer>
+                <ViewContainer key="funnel-real" label="Funil Real"><FunnelRealView /></ViewContainer>
               )}
               {activeTab === 'leads' && (
-                <ViewContainer key="leads"><LeadsView /></ViewContainer>
+                <ViewContainer key="leads" label="Lead Ads"><LeadsView /></ViewContainer>
               )}
               {activeTab === 'instagram' && (
-                <ViewContainer key="instagram"><InstagramView /></ViewContainer>
+                <ViewContainer key="instagram" label="Instagram"><InstagramView /></ViewContainer>
               )}
               {activeTab === 'creatives' && hasData && (
-                <ViewContainer key="creatives"><CreativesView /></ViewContainer>
+                <ViewContainer key="creatives" label="Criativos"><CreativesView /></ViewContainer>
               )}
               {activeTab === 'simulator' && hasData && (
-                <ViewContainer key="simulator"><BudgetSimulator /></ViewContainer>
+                <ViewContainer key="simulator" label="Simulador"><BudgetSimulator /></ViewContainer>
               )}
               {activeTab === 'report' && (
-                <ViewContainer key="report"><ReportView /></ViewContainer>
+                <ViewContainer key="report" label="Relatório"><ReportView /></ViewContainer>
               )}
               {activeTab === 'decisions' && (
-                <ViewContainer key="decisions"><DecisionsModule /></ViewContainer>
+                <ViewContainer key="decisions" label="Decisões"><DecisionsModule /></ViewContainer>
               )}
               {activeTab === 'experiments' && (
-                <ViewContainer key="experiments"><ExperimentsView /></ViewContainer>
+                <ViewContainer key="experiments" label="Experimentos"><ExperimentsView /></ViewContainer>
+              )}
+              {activeTab === 'ab-test' && (
+                <ViewContainer key="ab-test" label="A/B Test"><ABTestAnalyzer /></ViewContainer>
+              )}
+              {activeTab === 'anomalies' && (
+                <ViewContainer key="anomalies" label="Anomalias"><AnomalyDetectionView /></ViewContainer>
+              )}
+              {activeTab === 'forecast' && (
+                <ViewContainer key="forecast" label="Forecast"><ForecastView /></ViewContainer>
               )}
               {activeTab === 'utm-builder' && (
-                <ViewContainer key="utm-builder"><UtmBuilderView /></ViewContainer>
+                <ViewContainer key="utm-builder" label="UTM Builder"><UtmBuilderView /></ViewContainer>
               )}
               {activeTab === 'benchmarks' && (
-                <ViewContainer key="benchmarks"><BenchmarksView /></ViewContainer>
+                <ViewContainer key="benchmarks" label="Benchmarks"><BenchmarksView /></ViewContainer>
               )}
               {activeTab === 'health' && (
-                <ViewContainer key="health"><DataHealthView /></ViewContainer>
+                <ViewContainer key="health" label="Saúde"><DataHealthView /></ViewContainer>
               )}
               {activeTab === 'missing' && (
-                <ViewContainer key="missing"><MissingDataPanel /></ViewContainer>
+                <ViewContainer key="missing" label="Lacunas"><MissingDataPanel /></ViewContainer>
               )}
               {activeTab === 'alerts' && (
-                <ViewContainer key="alerts"><AlertsView /></ViewContainer>
+                <ViewContainer key="alerts" label="Alertas"><AlertsView /></ViewContainer>
               )}
               {activeTab === 'actions' && (
-                <ViewContainer key="actions"><ActionCenter /></ViewContainer>
+                <ViewContainer key="actions" label="Ações"><ActionCenter /></ViewContainer>
               )}
               {activeTab === 'ai' && (
-                <ViewContainer key="ai"><AIRecommendationsPanel /></ViewContainer>
+                <ViewContainer key="ai" label="IA Analyst"><AIRecommendationsPanel /></ViewContainer>
               )}
               {activeTab === 'personas' && (
-                <ViewContainer key="personas"><PersonaAudienceView /></ViewContainer>
+                <ViewContainer key="personas" label="Personas"><PersonaAudienceView /></ViewContainer>
               )}
             </AnimatePresence>
           </main>
@@ -238,13 +365,16 @@ function DashboardContent() {
         {!chatOpen && (
           <button
             onClick={() => setChatOpen(true)}
-            className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-meta-card hover:shadow-meta-modal flex items-center justify-center transition-all meta-button-press"
+            aria-label="Abrir assistente de IA"
+            title="Abrir assistente de IA (ou pressione Cmd+K)"
+            className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-primary text-primary-foreground shadow-meta-card hover:shadow-meta-modal flex items-center justify-center transition-all meta-button-press focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            <Bot className="h-5 w-5" strokeWidth={1.5} />
+            <Bot className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
           </button>
         )}
 
         <AIChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+        <CommandPalette activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
       <OnboardingTour />
     </SidebarProvider>

@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { AlertTriangle, Edit2, Check, Filter, Palette, Sparkles, TrendingDown, TrendingUp, BarChart2, Clock, Layers, Bot, Play, Pause, Image, Video, LayoutGrid, Eye } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -99,6 +100,145 @@ function brl(v: number) { return `R$ ${v.toLocaleString('pt-BR', { minimumFracti
 function StageBadge({ stage }: { stage: string }) {
   const cfg = STAGE_CONFIG[stage] || STAGE_CONFIG.fresh;
   return <Badge variant="outline" className={`text-[10px] font-mono border ${cfg.bgClass}`}>{cfg.badge} {cfg.label}</Badge>;
+}
+
+// ─── CreativesRankingTable (virtualized) ───
+// Large accounts can have hundreds of creative ads. We use table-row
+// virtualization (spacer rows above/below the visible window) so the DOM
+// stays small even with a big filtered list.
+function CreativesRankingTable({
+  filtered,
+  onAnalyze,
+}: {
+  filtered: EnrichedCreative[];
+  onAnalyze: (c: EnrichedCreative) => void;
+}) {
+  const ROW_HEIGHT = 40;
+  const VIRTUAL_THRESHOLD = 60;
+  const shouldVirtualize = filtered.length > VIRTUAL_THRESHOLD;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 12,
+  });
+
+  const virtualItems = shouldVirtualize ? virtualizer.getVirtualItems() : [];
+  const totalSize = shouldVirtualize ? virtualizer.getTotalSize() : 0;
+  const topPad = virtualItems.length > 0 ? virtualItems[0].start : 0;
+  const bottomPad =
+    virtualItems.length > 0 ? totalSize - virtualItems[virtualItems.length - 1].end : 0;
+  const visible = shouldVirtualize ? virtualItems.map((vi) => filtered[vi.index]) : filtered;
+
+  return (
+    <div className="glass-panel overflow-hidden">
+      <div
+        ref={scrollRef}
+        className="overflow-auto"
+        style={shouldVirtualize ? { maxHeight: '65vh' } : undefined}
+      >
+        <Table>
+          <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur">
+            <TableRow>
+              <TableHead className="text-[10px]">Criativo</TableHead>
+              <TableHead className="text-[10px]">Estágio</TableHead>
+              <TableHead className="text-[10px] text-right">Dias</TableHead>
+              <TableHead className="text-[10px] text-right">CTR</TableHead>
+              <TableHead className="text-[10px] text-right">Δ CTR</TableHead>
+              <TableHead className="text-[10px] text-right">CPL</TableHead>
+              <TableHead className="text-[10px] text-right">Freq.</TableHead>
+              <TableHead className="text-[10px] text-right">Spend</TableHead>
+              <TableHead className="text-[10px] text-right">Leads</TableHead>
+              <TableHead className="text-[10px]">Ação Sugerida</TableHead>
+              <TableHead className="text-[10px]">IA</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {shouldVirtualize && topPad > 0 && (
+              <tr aria-hidden style={{ height: `${topPad}px` }}>
+                <td colSpan={11} />
+              </tr>
+            )}
+            {visible.map((c) => {
+              const cfg = STAGE_CONFIG[c.lifecycle_stage] || STAGE_CONFIG.fresh;
+              const degradColor =
+                c.degradation_pct > 30
+                  ? 'text-red-400'
+                  : c.degradation_pct > 15
+                    ? 'text-amber-400'
+                    : 'text-emerald-400';
+              return (
+                <TableRow
+                  key={c.id}
+                  className={
+                    c.lifecycle_stage === 'fatigued'
+                      ? 'bg-red-500/5'
+                      : c.lifecycle_stage === 'declining'
+                        ? 'bg-amber-500/5'
+                        : ''
+                  }
+                  style={{ height: `${ROW_HEIGHT}px` }}
+                >
+                  <TableCell className="text-xs font-medium max-w-[180px] truncate" title={c.ad_name}>
+                    {c.ad_name}
+                  </TableCell>
+                  <TableCell>
+                    <StageBadge stage={c.lifecycle_stage} />
+                  </TableCell>
+                  <TableCell className="text-xs font-mono text-right">{c.days_active}d</TableCell>
+                  <TableCell className="text-xs font-mono text-right">{c.avg_ctr.toFixed(2)}%</TableCell>
+                  <TableCell className={`text-xs font-mono text-right font-bold ${degradColor}`}>
+                    {c.degradation_pct > 0 ? '-' : ''}
+                    {c.degradation_pct.toFixed(0)}%
+                  </TableCell>
+                  <TableCell className="text-xs font-mono text-right">
+                    {c.avg_cpl > 0 ? brl(c.avg_cpl) : '—'}
+                  </TableCell>
+                  <TableCell
+                    className={`text-xs font-mono text-right ${
+                      c.avg_frequency > 3.5
+                        ? 'text-red-400 font-bold'
+                        : c.avg_frequency > 2.5
+                          ? 'text-amber-400'
+                          : ''
+                    }`}
+                  >
+                    {c.avg_frequency.toFixed(1)}
+                  </TableCell>
+                  <TableCell className="text-xs font-mono text-right">{brl(c.total_spend)}</TableCell>
+                  <TableCell className="text-xs font-mono text-right">{c.total_leads}</TableCell>
+                  <TableCell className="text-[10px]">{cfg.action}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => onAnalyze(c)}
+                    >
+                      <Bot className="h-3 w-3 text-primary" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            {shouldVirtualize && bottomPad > 0 && (
+              <tr aria-hidden style={{ height: `${bottomPad}px` }}>
+                <td colSpan={11} />
+              </tr>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      {filtered.length > 0 && (
+        <div className="px-3 py-2 border-t border-border text-[10px] text-muted-foreground">
+          {shouldVirtualize
+            ? `${filtered.length} criativos · virtualização ativa`
+            : `${filtered.length} criativos`}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function enrichCreatives(creatives: AdCreative[], allMetrics: DailyMetric[]): EnrichedCreative[] {
@@ -921,56 +1061,10 @@ export default function CreativesView() {
 
         {/* Tab 2: Ranking Table */}
         <TabsContent value="ranking">
-          <div className="glass-panel overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-[10px]">Criativo</TableHead>
-                    <TableHead className="text-[10px]">Estágio</TableHead>
-                    <TableHead className="text-[10px] text-right">Dias</TableHead>
-                    <TableHead className="text-[10px] text-right">CTR</TableHead>
-                    <TableHead className="text-[10px] text-right">Δ CTR</TableHead>
-                    <TableHead className="text-[10px] text-right">CPL</TableHead>
-                    <TableHead className="text-[10px] text-right">Freq.</TableHead>
-                    <TableHead className="text-[10px] text-right">Spend</TableHead>
-                    <TableHead className="text-[10px] text-right">Leads</TableHead>
-                    <TableHead className="text-[10px]">Ação Sugerida</TableHead>
-                    <TableHead className="text-[10px]">IA</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map(c => {
-                    const cfg = STAGE_CONFIG[c.lifecycle_stage] || STAGE_CONFIG.fresh;
-                    const degradColor = c.degradation_pct > 30 ? 'text-red-400' : c.degradation_pct > 15 ? 'text-amber-400' : 'text-emerald-400';
-                    return (
-                      <TableRow key={c.id} className={c.lifecycle_stage === 'fatigued' ? 'bg-red-500/5' : c.lifecycle_stage === 'declining' ? 'bg-amber-500/5' : ''}>
-                        <TableCell className="text-xs font-medium max-w-[180px] truncate" title={c.ad_name}>{c.ad_name}</TableCell>
-                        <TableCell><StageBadge stage={c.lifecycle_stage} /></TableCell>
-                        <TableCell className="text-xs font-mono text-right">{c.days_active}d</TableCell>
-                        <TableCell className="text-xs font-mono text-right">{c.avg_ctr.toFixed(2)}%</TableCell>
-                        <TableCell className={`text-xs font-mono text-right font-bold ${degradColor}`}>
-                          {c.degradation_pct > 0 ? '-' : ''}{c.degradation_pct.toFixed(0)}%
-                        </TableCell>
-                        <TableCell className="text-xs font-mono text-right">{c.avg_cpl > 0 ? brl(c.avg_cpl) : '—'}</TableCell>
-                        <TableCell className={`text-xs font-mono text-right ${c.avg_frequency > 3.5 ? 'text-red-400 font-bold' : c.avg_frequency > 2.5 ? 'text-amber-400' : ''}`}>
-                          {c.avg_frequency.toFixed(1)}
-                        </TableCell>
-                        <TableCell className="text-xs font-mono text-right">{brl(c.total_spend)}</TableCell>
-                        <TableCell className="text-xs font-mono text-right">{c.total_leads}</TableCell>
-                        <TableCell className="text-[10px]">{cfg.action}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setAnalyzingCreative(c)}>
-                            <Bot className="h-3 w-3 text-primary" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
+          <CreativesRankingTable
+            filtered={filtered}
+            onAnalyze={setAnalyzingCreative}
+          />
         </TabsContent>
 
         {/* Tab 3: Degradation */}

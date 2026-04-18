@@ -151,8 +151,34 @@ export default function InsightCards({ onFilterTable }: InsightCardsProps) {
 
     const { aggregated, byKey } = buildLeadQualityMetrics(state.leadQuality, spendByCampaign);
 
-    return generateInsights(currentMetrics, delta, rows, aggregated, byKey, creatives);
-  }, [current, previous, state.analysisLevel, state.leadQuality, creatives]);
+    // Advanced (statistical) context: lets rules.ts call anomaly / pacing / elasticity / movers.
+    // Pick the matching target for the currently selected period so pacing can project vs meta.
+    const activePeriodKey =
+      state.selectedPeriodKey ||
+      (state.dateFrom && state.dateTo && state.dateFrom.slice(0, 7) === state.dateTo.slice(0, 7)
+        ? state.dateFrom.slice(0, 7)
+        : null);
+    const spendTarget = activePeriodKey
+      ? state.targets.find((t) => t.period_key === activePeriodKey)?.spend
+      : undefined;
+
+    return generateInsights(currentMetrics, delta, rows, aggregated, byKey, creatives, {
+      records: current,
+      dateFrom: state.dateFrom,
+      dateTo: state.dateTo,
+      spendTarget,
+    });
+  }, [
+    current,
+    previous,
+    state.analysisLevel,
+    state.leadQuality,
+    state.targets,
+    state.selectedPeriodKey,
+    state.dateFrom,
+    state.dateTo,
+    creatives,
+  ]);
 
   if (insights.length === 0) return null;
 
